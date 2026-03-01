@@ -2333,9 +2333,16 @@ where
         //   (otherwise: "function_call was provided without its required 'reasoning' item")
         // - When there are NO tool calls: MUST NOT include reasoning as standalone
         //   (otherwise: "reasoning was provided without its required following item")
-        let is_openai_responses = ctx.provider_name == "openai_responses";
+        //
+        // Both "openai_responses" (non-reasoning models via rig-core) and "openai_reasoning"
+        // (gpt-5.2, Codex, o-series via rig-openai-responses) use the same Responses API and
+        // must obey the same reasoning-item sequencing rule.
+        let is_openai_responses_api = matches!(
+            ctx.provider_name,
+            "openai_responses" | "openai_reasoning"
+        );
         let has_reasoning = !thinking_content.is_empty() || thinking_id.is_some();
-        let should_include_reasoning = if is_openai_responses {
+        let should_include_reasoning = if is_openai_responses_api {
             // For OpenAI Responses API: only include reasoning when there are tool calls
             has_reasoning && has_tool_calls
         } else {
@@ -4021,9 +4028,9 @@ mod openai_tracing_tests {
             .await;
 
         let thinking = "Step 1: understand the request. Step 2: formulate response.";
-        let model =
-            MockCompletionModel::new(vec![MockResponse::text("Here is my answer.")
-                .with_thinking(thinking)]);
+        let model = MockCompletionModel::new(vec![
+            MockResponse::text("Here is my answer.").with_thinking(thinking)
+        ]);
 
         let client = Arc::new(RwLock::new(LlmClient::Mock));
         let mut ctx = test_ctx.as_agentic_context_with_client(&client);
@@ -4076,8 +4083,7 @@ mod openai_tracing_tests {
         );
 
         // gpt-5.2-codex via openai_reasoning
-        let config =
-            AgenticLoopConfig::with_detection("openai_reasoning", "gpt-5.2-codex", false);
+        let config = AgenticLoopConfig::with_detection("openai_reasoning", "gpt-5.2-codex", false);
         assert!(
             config.capabilities.supports_thinking_history,
             "gpt-5.2-codex via openai_reasoning must support thinking history"
@@ -4096,6 +4102,71 @@ mod openai_tracing_tests {
         assert!(
             !config.capabilities.supports_temperature,
             "o4-mini must not use temperature"
+        );
+    }
+
+    /// Verify that "openai_reasoning" obeys the same Responses API reasoning-sequencing rule
+    /// as "openai_responses": reasoning items must not be added to history without a following
+    /// tool call (otherwise OpenAI returns "reasoning was provided without its required
+    /// following item").
+    ///
+    /// When the model returns reasoning + text but NO tool calls, the reasoning block must
+    /// NOT appear in the conversation history sent back to the API.
+    #[tokio::test]
+    async fn test_openai_reasoning_excludes_reasoning_from_history_without_tool_calls() {
+        let test_ctx = TestContextBuilder::new()
+            .agent_mode(crate::agent_mode::AgentMode::AutoApprove)
+            .build()
+            .await;
+
+        // Model returns thinking + text (no tool calls) — the Responses API constraint
+        // requires we must NOT include the reasoning item in the assistant history turn.
+        let model = MockCompletionModel::new(vec![MockResponse::text_with_thinking(
+            "The answer is 4.",
+            "Simple arithmetic: 2+2=4",
+        )]);
+
+        let client = Arc::new(RwLock::new(LlmClient::Mock));
+        let mut ctx = test_ctx.as_agentic_context_with_client(&client);
+        ctx.provider_name = "openai_reasoning";
+        ctx.model_name = "gpt-5.2";
+
+        let initial_history = vec![rig::completion::Message::User {
+            content: rig::one_or_many::OneOrMany::one(rig::message::UserContent::Text(
+                rig::message::Text {
+                    text: "What is 2+2?".to_string(),
+                },
+            )),
+        }];
+
+        let result = run_agentic_loop_generic(
+            &model,
+            "You are a math tutor.",
+            initial_history,
+            openai_reasoning_sub_context(),
+            &ctx,
+        )
+        .await;
+
+        assert!(result.is_ok(), "Loop should succeed: {:?}", result.err());
+        let (response, _reasoning, history, _usage) = result.unwrap();
+        assert!(response.contains("4"), "Response should contain the answer");
+
+        // The assistant message in history must NOT contain a Reasoning block when there
+        // were no tool calls — that would cause an OpenAI API error on the next turn.
+        let has_orphaned_reasoning = history.iter().any(|msg| {
+            if let rig::completion::Message::Assistant { content, .. } = msg {
+                content
+                    .iter()
+                    .any(|c| matches!(c, rig::completion::AssistantContent::Reasoning(_)))
+            } else {
+                false
+            }
+        });
+        assert!(
+            !has_orphaned_reasoning,
+            "openai_reasoning must not include reasoning in history when there are no tool calls \
+             (would cause: 'reasoning was provided without its required following item')"
         );
     }
 }
