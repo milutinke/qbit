@@ -203,7 +203,8 @@ impl CompletionModel {
         // Apply overrides from additional_params if a "reasoning" key is present.
         // This allows the agentic loop to override effort/summary without conflicting
         // with the model struct settings. Unknown keys are silently ignored.
-        let reasoning = apply_additional_params_reasoning(reasoning, request.additional_params.as_ref());
+        let reasoning =
+            apply_additional_params_reasoning(reasoning, request.additional_params.as_ref());
 
         // Build the request
         // Note: Reasoning models (o1, o3, o4, gpt-5.x) don't support temperature
@@ -1163,9 +1164,9 @@ mod build_request_tests {
         let model = make_model("gpt-5.2", None);
         let req = model.build_request(&minimal_request()).unwrap();
 
-        let reasoning = req.reasoning.expect(
-            "gpt-5.2 must have reasoning config even without explicit effort setting",
-        );
+        let reasoning = req
+            .reasoning
+            .expect("gpt-5.2 must have reasoning config even without explicit effort setting");
         assert_eq!(
             reasoning.summary,
             Some(ReasoningSummary::Detailed),
@@ -1214,12 +1215,24 @@ mod build_request_tests {
     /// PASSES after fix.
     #[test]
     fn test_all_reasoning_model_prefixes_get_config_without_effort() {
-        let reasoning_models = ["o1", "o1-preview", "o3", "o3-mini", "o4-mini", "gpt-5", "gpt-5.1", "gpt-5.2-codex"];
+        let reasoning_models = [
+            "o1",
+            "o1-preview",
+            "o3",
+            "o3-mini",
+            "o4-mini",
+            "gpt-5",
+            "gpt-5.1",
+            "gpt-5.2-codex",
+        ];
         for model_id in &reasoning_models {
             let model = make_model(model_id, None);
             let req = model.build_request(&minimal_request()).unwrap();
             let reasoning = req.reasoning.unwrap_or_else(|| {
-                panic!("{} must have reasoning config even without explicit effort", model_id)
+                panic!(
+                    "{} must have reasoning config even without explicit effort",
+                    model_id
+                )
             });
             assert_eq!(
                 reasoning.summary,

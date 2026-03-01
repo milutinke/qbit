@@ -509,11 +509,17 @@ mod tests {
     fn test_openai_reasoning_provider_temperature_support() {
         // "openai_reasoning" provider must apply the same temperature rules as "openai"
         assert!(!model_supports_temperature("openai_reasoning", "gpt-5.2"));
-        assert!(!model_supports_temperature("openai_reasoning", "gpt-5.2-codex"));
+        assert!(!model_supports_temperature(
+            "openai_reasoning",
+            "gpt-5.2-codex"
+        ));
         assert!(!model_supports_temperature("openai_reasoning", "o3"));
         assert!(!model_supports_temperature("openai_reasoning", "o4-mini"));
         assert!(!model_supports_temperature("openai_reasoning", "o1"));
-        assert!(!model_supports_temperature("openai_reasoning", "gpt-5.1-codex-max"));
+        assert!(!model_supports_temperature(
+            "openai_reasoning",
+            "gpt-5.1-codex-max"
+        ));
     }
 
     #[test]
