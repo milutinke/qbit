@@ -675,18 +675,13 @@ where
                         // This was previously skipped with "Skip recording for now" — fixed here.
                         use rig::completion::GetTokenUsage;
                         if let Some(usage) = resp.token_usage() {
-                            llm_span.record(
-                                "gen_ai.usage.prompt_tokens",
-                                usage.input_tokens as i64,
-                            );
+                            llm_span
+                                .record("gen_ai.usage.prompt_tokens", usage.input_tokens as i64);
                             llm_span.record(
                                 "gen_ai.usage.completion_tokens",
                                 usage.output_tokens as i64,
                             );
                         }
-                    }
-                    _ => {
-                        // Ignore other stream content types
                     }
                 },
                 Err(e) => {
