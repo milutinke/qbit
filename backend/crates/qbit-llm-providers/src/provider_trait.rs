@@ -127,7 +127,8 @@ impl LlmProvider for OpenAiProviderImpl {
             if let Some(ref effort_str) = self.reasoning_effort {
                 let effort = match effort_str.to_lowercase().as_str() {
                     "low" => rig_openai_responses::ReasoningEffort::Low,
-                    "high" | "extra_high" => rig_openai_responses::ReasoningEffort::High,
+                    "high" => rig_openai_responses::ReasoningEffort::High,
+                    "extra_high" | "xhigh" => rig_openai_responses::ReasoningEffort::ExtraHigh,
                     _ => rig_openai_responses::ReasoningEffort::Medium,
                 };
                 completion_model = completion_model.with_reasoning_effort(effort);
