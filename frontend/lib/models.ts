@@ -222,6 +222,26 @@ export const PROVIDER_GROUPS: ProviderGroup[] = [
       { id: OPENAI_MODELS.O1, name: "o1 (High)", reasoningEffort: "high" },
       // Codex models (coding-optimized)
       {
+        id: OPENAI_MODELS.GPT_5_3_CODEX,
+        name: "GPT 5.3 Codex (Low)",
+        reasoningEffort: "low",
+      },
+      {
+        id: OPENAI_MODELS.GPT_5_3_CODEX,
+        name: "GPT 5.3 Codex (Medium)",
+        reasoningEffort: "medium",
+      },
+      {
+        id: OPENAI_MODELS.GPT_5_3_CODEX,
+        name: "GPT 5.3 Codex (High)",
+        reasoningEffort: "high",
+      },
+      {
+        id: OPENAI_MODELS.GPT_5_3_CODEX,
+        name: "GPT 5.3 Codex (Extra High)",
+        reasoningEffort: "extra_high",
+      },
+      {
         id: OPENAI_MODELS.GPT_5_2_CODEX,
         name: "GPT 5.2 Codex (Low)",
         reasoningEffort: "low",
@@ -582,6 +602,31 @@ export const PROVIDER_GROUPS_NESTED: ProviderGroupNested[] = [
       {
         name: "Codex",
         subModels: [
+          {
+            name: "GPT 5.3 Codex",
+            subModels: [
+              {
+                id: OPENAI_MODELS.GPT_5_3_CODEX,
+                name: "Low",
+                reasoningEffort: "low",
+              },
+              {
+                id: OPENAI_MODELS.GPT_5_3_CODEX,
+                name: "Medium",
+                reasoningEffort: "medium",
+              },
+              {
+                id: OPENAI_MODELS.GPT_5_3_CODEX,
+                name: "High",
+                reasoningEffort: "high",
+              },
+              {
+                id: OPENAI_MODELS.GPT_5_3_CODEX,
+                name: "Extra High",
+                reasoningEffort: "extra_high",
+              },
+            ],
+          },
           {
             name: "GPT 5.2 Codex",
             subModels: [
