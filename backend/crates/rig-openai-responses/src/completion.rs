@@ -3,10 +3,11 @@
 use async_openai::config::OpenAIConfig;
 use async_openai::types::responses::{
     CreateResponse, EasyInputContent, EasyInputMessage, FunctionCallOutput,
-    FunctionCallOutputItemParam, FunctionTool, FunctionToolCall, ImageDetail, InputContent,
-    InputImageContent, InputItem, InputParam, InputTextContent, Item, MessageType, OutputItem,
-    OutputMessageContent, Reasoning, ReasoningEffort as OAReasoningEffort, ReasoningItem,
-    ReasoningSummary, Response, ResponseStreamEvent, Role, Summary, SummaryPart, Tool,
+    FunctionCallOutputItemParam, FunctionTool, FunctionToolCall, ImageDetail, IncludeEnum,
+    InputContent, InputImageContent, InputItem, InputParam, InputTextContent, Item, MessageType,
+    OutputItem, OutputMessageContent, Reasoning, ReasoningEffort as OAReasoningEffort,
+    ReasoningItem, ReasoningSummary, Response, ResponseStreamEvent, Role, Summary, SummaryPart,
+    Tool,
 };
 use async_openai::Client as OpenAIClient;
 use futures::StreamExt;
@@ -222,6 +223,25 @@ impl CompletionModel {
             request.temperature.map(|t| t as f32)
         };
 
+        // For reasoning models, request encrypted_content to enable stateless multi-turn conversations.
+        // Without this, OpenAI rejects reasoning items in subsequent turns with:
+        // "Item 'rs_...' of type 'reasoning' was provided without its required following item"
+        let include = if crate::is_reasoning_model(&self.model) {
+            Some(vec![IncludeEnum::ReasoningEncryptedContent])
+        } else {
+            None
+        };
+
+        // For stateless operation with reasoning models, we must set store=false.
+        // This tells OpenAI we're managing conversation history ourselves and will
+        // include encrypted_content in reasoning items for multi-turn conversations.
+        // See: https://community.openai.com/t/one-potential-cause-of-item-rs-xx-of-type-reasoning-was-provided-without-its-required-following-item-error-stateless-using-agents-sdk/1370540
+        let store = if crate::is_reasoning_model(&self.model) {
+            Some(false)
+        } else {
+            None
+        };
+
         Ok(CreateResponse {
             model: Some(self.model.clone()),
             input,
@@ -229,6 +249,8 @@ impl CompletionModel {
             reasoning,
             temperature,
             max_output_tokens: request.max_tokens.map(|t| t as u32),
+            include,
+            store,
             ..Default::default()
         })
     }
@@ -280,9 +302,14 @@ impl CompletionModel {
                     };
 
                     if !all_parts.is_empty() {
-                        // Create Reasoning with multi() to preserve structure
+                        // Create Reasoning with multi() to preserve structure.
+                        // Store encrypted_content in the signature field - this allows us to
+                        // pass it back to OpenAI in subsequent turns for stateless operation.
+                        // See: https://platform.openai.com/docs/guides/reasoning
                         content.push(AssistantContent::Reasoning(
-                            rig::message::Reasoning::multi(all_parts).with_id(reasoning.id.clone()),
+                            rig::message::Reasoning::multi(all_parts)
+                                .with_id(reasoning.id.clone())
+                                .with_signature(reasoning.encrypted_content.clone()),
                         ));
                     }
                 }
@@ -346,6 +373,11 @@ impl std::fmt::Debug for CompletionModel {
 pub struct StreamingResponseData {
     /// Token usage statistics (populated at end of stream).
     pub usage: Option<Usage>,
+    /// Map of reasoning item IDs to their encrypted_content (for stateless multi-turn).
+    /// This is populated from ResponseCompleted and allows the agentic loop to
+    /// inject encrypted_content into accumulated reasoning items.
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub reasoning_encrypted_content: std::collections::HashMap<String, String>,
 }
 
 /// Token usage for streaming responses.
@@ -500,7 +532,7 @@ fn map_stream_event(
             }
         }
 
-        // Response completed → FinalResponse with usage
+        // Response completed → FinalResponse with usage and reasoning encrypted_content
         ResponseStreamEvent::ResponseCompleted(e) => {
             tracing::info!("Response completed");
             let usage = e.response.usage.map(|u| Usage {
@@ -508,8 +540,45 @@ fn map_stream_event(
                 output_tokens: u.output_tokens,
                 total_tokens: u.total_tokens,
             });
+
+            // Extract reasoning items' encrypted_content for stateless multi-turn support.
+            // This allows the agentic loop to inject encrypted_content into accumulated
+            // reasoning items, which is required for subsequent turns with reasoning models.
+            let mut reasoning_encrypted_content = std::collections::HashMap::new();
+            let reasoning_item_count = e.response.output.iter()
+                .filter(|item| matches!(item, OutputItem::Reasoning(_)))
+                .count();
+
+            for output in &e.response.output {
+                if let OutputItem::Reasoning(reasoning) = output {
+                    if let Some(encrypted) = &reasoning.encrypted_content {
+                        reasoning_encrypted_content.insert(reasoning.id.clone(), encrypted.clone());
+                        tracing::debug!(
+                            "[OpenAI] Captured encrypted_content for reasoning {}: {} bytes",
+                            reasoning.id,
+                            encrypted.len()
+                        );
+                    } else {
+                        tracing::warn!(
+                            "[OpenAI] Reasoning item {} has NO encrypted_content! This will cause multi-turn failures. \
+                             Make sure 'include: [reasoning.encrypted_content]' is in the request.",
+                            reasoning.id
+                        );
+                    }
+                }
+            }
+
+            if reasoning_item_count > 0 && reasoning_encrypted_content.is_empty() {
+                tracing::error!(
+                    "[OpenAI] Found {} reasoning items but captured 0 encrypted_content values! \
+                     The 'include' parameter may not be working.",
+                    reasoning_item_count
+                );
+            }
+
             Some(RawStreamingChoice::FinalResponse(StreamingResponseData {
                 usage,
+                reasoning_encrypted_content,
             }))
         }
 
@@ -821,11 +890,31 @@ fn convert_assistant_content_to_items(content: &OneOrMany<AssistantContent>) -> 
                     .map(|text| SummaryPart::SummaryText(Summary { text: text.clone() }))
                     .collect();
 
+                // Pass through encrypted_content (stored in signature field) for stateless operation.
+                // This is required for multi-turn conversations with reasoning models when not using
+                // previous_response_id. See: https://platform.openai.com/docs/guides/reasoning
+                let encrypted_content = reasoning.signature.clone();
+
+                // Log whether encrypted_content is present (critical for multi-turn)
+                if encrypted_content.is_some() {
+                    tracing::debug!(
+                        "[OpenAI] Converting reasoning {} WITH encrypted_content ({} bytes)",
+                        id,
+                        encrypted_content.as_ref().map(|s| s.len()).unwrap_or(0)
+                    );
+                } else {
+                    tracing::warn!(
+                        "[OpenAI] Converting reasoning {} WITHOUT encrypted_content! \
+                         This will cause 'provided without its required following item' error on next turn.",
+                        id
+                    );
+                }
+
                 items.push(InputItem::Item(Item::Reasoning(ReasoningItem {
                     id,
                     summary,
                     content: None,
-                    encrypted_content: None,
+                    encrypted_content,
                     status: None,
                 })));
             }
@@ -1133,6 +1222,58 @@ mod tests {
             _ => panic!("Expected Item::Reasoning"),
         }
     }
+
+    /// Test that encrypted_content is passed through from signature field to ReasoningItem.
+    /// This is critical for stateless multi-turn conversations with reasoning models.
+    #[test]
+    fn test_reasoning_encrypted_content_roundtrip() {
+        // Simulate a reasoning item captured from OpenAI response with encrypted_content
+        // stored in the signature field
+        let reasoning = rig::message::Reasoning::multi(vec!["I'm thinking...".to_string()])
+            .with_id("rs_abc123".to_string())
+            .with_signature(Some("encrypted_data_blob_xyz".to_string()));
+
+        let content = OneOrMany::one(AssistantContent::Reasoning(reasoning));
+        let result = convert_assistant_content_to_items(&content);
+
+        assert_eq!(result.len(), 1);
+        match &result[0] {
+            InputItem::Item(Item::Reasoning(reasoning_item)) => {
+                assert_eq!(reasoning_item.id, "rs_abc123");
+                // The encrypted_content should be passed through from signature
+                assert_eq!(
+                    reasoning_item.encrypted_content,
+                    Some("encrypted_data_blob_xyz".to_string()),
+                    "encrypted_content must be passed through for stateless operation"
+                );
+            }
+            _ => panic!("Expected Item::Reasoning"),
+        }
+    }
+
+    /// Test that reasoning without encrypted_content still works (backward compatibility)
+    #[test]
+    fn test_reasoning_without_encrypted_content() {
+        let reasoning = rig::message::Reasoning::multi(vec!["Just thinking...".to_string()])
+            .with_id("rs_no_encryption".to_string());
+        // No signature/encrypted_content set
+
+        let content = OneOrMany::one(AssistantContent::Reasoning(reasoning));
+        let result = convert_assistant_content_to_items(&content);
+
+        assert_eq!(result.len(), 1);
+        match &result[0] {
+            InputItem::Item(Item::Reasoning(reasoning_item)) => {
+                assert_eq!(reasoning_item.id, "rs_no_encryption");
+                // encrypted_content should be None when signature wasn't set
+                assert!(
+                    reasoning_item.encrypted_content.is_none(),
+                    "encrypted_content should be None when no signature was set"
+                );
+            }
+            _ => panic!("Expected Item::Reasoning"),
+        }
+    }
 }
 
 // ============================================================================
@@ -1275,6 +1416,46 @@ mod build_request_tests {
             assert!(
                 req.reasoning.is_none(),
                 "{} must not have reasoning config",
+                model_id
+            );
+            // Non-reasoning models should NOT have include for encrypted_content
+            assert!(
+                req.include.is_none(),
+                "{} must not request encrypted_content include",
+                model_id
+            );
+        }
+    }
+
+    /// Test that reasoning models request encrypted_content via include parameter.
+    /// This is critical for stateless multi-turn conversations.
+    #[test]
+    fn test_reasoning_model_requests_encrypted_content_include() {
+        let model = make_model("gpt-5.2", None);
+        let req = model.build_request(&minimal_request()).unwrap();
+
+        let include = req
+            .include
+            .expect("reasoning models must have include parameter");
+        assert!(
+            include.contains(&IncludeEnum::ReasoningEncryptedContent),
+            "must include reasoning.encrypted_content for stateless operation"
+        );
+    }
+
+    /// Test that all reasoning model prefixes request encrypted_content.
+    #[test]
+    fn test_all_reasoning_models_request_encrypted_content() {
+        let reasoning_models = ["o1", "o3-mini", "o4-mini", "gpt-5", "gpt-5.2-codex"];
+        for model_id in &reasoning_models {
+            let model = make_model(model_id, None);
+            let req = model.build_request(&minimal_request()).unwrap();
+            let include = req.include.unwrap_or_else(|| {
+                panic!("{} must have include parameter", model_id)
+            });
+            assert!(
+                include.contains(&IncludeEnum::ReasoningEncryptedContent),
+                "{} must request encrypted_content",
                 model_id
             );
         }
