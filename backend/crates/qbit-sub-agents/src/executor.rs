@@ -682,6 +682,42 @@ where
                                 usage.output_tokens as i64,
                             );
                         }
+
+                        // Extract reasoning encrypted_content from OpenAI Responses API
+                        // Required for stateless multi-turn with reasoning models (GPT-5.x, o3, o4-mini)
+                        if let Ok(json_value) = serde_json::to_value(resp) {
+                            if let Some(encrypted_map) = json_value
+                                .get("reasoning_encrypted_content")
+                                .and_then(|v| v.as_object())
+                            {
+                                if let Some(ref tid) = thinking_id {
+                                    if let Some(encrypted) = encrypted_map.get(tid).and_then(|v| v.as_str()) {
+                                        tracing::debug!(
+                                            "[sub-agent] Found encrypted_content for reasoning item {}: {} bytes",
+                                            tid,
+                                            encrypted.len()
+                                        );
+                                        thinking_signature = Some(encrypted.to_string());
+                                    }
+                                }
+                                // Fallback: use single entry if only one reasoning item
+                                if thinking_signature.is_none() && encrypted_map.len() == 1 {
+                                    if let Some((id, encrypted)) = encrypted_map.iter().next() {
+                                        if let Some(encrypted_str) = encrypted.as_str() {
+                                            tracing::debug!(
+                                                "[sub-agent] Using single encrypted_content for reasoning item {}: {} bytes",
+                                                id,
+                                                encrypted_str.len()
+                                            );
+                                            thinking_signature = Some(encrypted_str.to_string());
+                                            if thinking_id.is_none() {
+                                                thinking_id = Some(id.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
                 Err(e) => {

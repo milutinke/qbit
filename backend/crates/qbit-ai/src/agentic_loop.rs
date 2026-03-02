@@ -2213,6 +2213,70 @@ where
                                 });
                             }
 
+                            // Extract reasoning encrypted_content from OpenAI Responses API
+                            // The Final response may contain reasoning_encrypted_content which is
+                            // required for stateless multi-turn conversations with reasoning models.
+                            // We serialize to JSON and check for the OpenAI-specific field.
+                            if let Ok(json_value) = serde_json::to_value(resp) {
+                                // Log what we're seeing in the Final response
+                                let has_encrypted_field = json_value.get("reasoning_encrypted_content").is_some();
+                                tracing::info!(
+                                    "[OpenAI Debug] Final response: has_reasoning_encrypted_content={}, thinking_id={:?}, thinking_signature_before={:?}",
+                                    has_encrypted_field,
+                                    thinking_id,
+                                    thinking_signature.as_ref().map(|s| s.len())
+                                );
+
+                                if let Some(encrypted_map) = json_value
+                                    .get("reasoning_encrypted_content")
+                                    .and_then(|v| v.as_object())
+                                {
+                                    tracing::info!(
+                                        "[OpenAI Debug] encrypted_map has {} entries: {:?}",
+                                        encrypted_map.len(),
+                                        encrypted_map.keys().collect::<Vec<_>>()
+                                    );
+                                    
+                                    // If we have accumulated thinking and captured a thinking_id,
+                                    // look up the encrypted_content for that reasoning item
+                                    if let Some(ref tid) = thinking_id {
+                                        if let Some(encrypted) = encrypted_map.get(tid).and_then(|v| v.as_str()) {
+                                            tracing::info!(
+                                                "[OpenAI Debug] Found encrypted_content for reasoning item {}: {} bytes",
+                                                tid,
+                                                encrypted.len()
+                                            );
+                                            thinking_signature = Some(encrypted.to_string());
+                                        } else {
+                                            tracing::warn!(
+                                                "[OpenAI Debug] thinking_id {} NOT FOUND in encrypted_map!",
+                                                tid
+                                            );
+                                        }
+                                    }
+                                    // If we don't have a thinking_id but have exactly one reasoning item,
+                                    // use that one (common case: single reasoning block in response)
+                                    if thinking_signature.is_none() && encrypted_map.len() == 1 {
+                                        if let Some((id, encrypted)) = encrypted_map.iter().next() {
+                                            if let Some(encrypted_str) = encrypted.as_str() {
+                                                tracing::info!(
+                                                    "[OpenAI Debug] Using single encrypted_content for reasoning item {}: {} bytes",
+                                                    id,
+                                                    encrypted_str.len()
+                                                );
+                                                thinking_signature = Some(encrypted_str.to_string());
+                                                // Also set thinking_id if not set
+                                                if thinking_id.is_none() {
+                                                    thinking_id = Some(id.clone());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                tracing::warn!("[OpenAI Debug] Failed to serialize Final response to JSON");
+                            }
+
                             // Finalize any pending tool call from deltas
                             if let (Some(id), Some(name)) =
                                 (current_tool_id.take(), current_tool_name.take())
@@ -2328,28 +2392,39 @@ where
         let mut assistant_content: Vec<AssistantContent> = vec![];
 
         // Conditionally add thinking content first (required by Anthropic API when thinking is enabled)
-        // OpenAI Responses API reasoning handling:
-        // - When there ARE tool calls: MUST include reasoning because tool calls reference it via rs_... IDs
-        //   (otherwise: "function_call was provided without its required 'reasoning' item")
-        // - When there are NO tool calls: MUST NOT include reasoning as standalone
-        //   (otherwise: "reasoning was provided without its required following item")
+        // OpenAI Responses API reasoning handling differs between providers:
         //
-        // Both "openai_responses" (non-reasoning models via rig-core) and "openai_reasoning"
-        // (gpt-5.2, Codex, o-series via rig-openai-responses) use the same Responses API and
-        // must obey the same reasoning-item sequencing rule.
-        let is_openai_responses_api = matches!(
-            ctx.provider_name,
-            "openai_responses" | "openai_reasoning"
-        );
+        // "openai_reasoning" (rig-openai-responses, gpt-5.2, Codex, o-series):
+        //   - Always include reasoning in history when present. OpenAI tracks rs_... IDs
+        //     server-side and requires them to be echoed back in every subsequent turn.
+        //   - A reasoning item MUST be followed by the next output item (text OR tool call).
+        //   - Omitting a reasoning item from a turn where it was generated causes:
+        //     "Item 'rs_...' of type 'reasoning' was provided without its required following item"
+        //
+        // "openai_responses" (rig-core built-in, non-reasoning models via Responses API):
+        //   - Only include reasoning when there are tool calls. Without a following function_call
+        //     the API returns: "reasoning was provided without its required following item"
+        //   - These models use internal reasoning IDs that are only meaningful when paired with
+        //     a function call; standalone reasoning items are not valid for text-only turns.
+        let is_openai_reasoning_provider = ctx.provider_name == "openai_reasoning";
+        let is_openai_responses_api = ctx.provider_name == "openai_responses";
         let has_reasoning = !thinking_content.is_empty() || thinking_id.is_some();
-        let should_include_reasoning = if is_openai_responses_api {
-            // For OpenAI Responses API: only include reasoning when there are tool calls
+        let should_include_reasoning = if is_openai_reasoning_provider {
+            // Always include reasoning for openai_reasoning — rs_ IDs must be echoed back
+            has_reasoning
+        } else if is_openai_responses_api {
+            // For openai_responses: only include reasoning when paired with a tool call
             has_reasoning && has_tool_calls
         } else {
             // For other providers (Anthropic, etc.): include reasoning when present
             has_reasoning
         };
         if supports_thinking && should_include_reasoning {
+            tracing::info!(
+                "[OpenAI Debug] Building assistant content with reasoning: id={:?}, signature_len={:?}",
+                thinking_id,
+                thinking_signature.as_ref().map(|s| s.len())
+            );
             assistant_content.push(AssistantContent::Reasoning(
                 Reasoning::multi(vec![thinking_content.clone()])
                     .optional_id(thinking_id.clone())
@@ -4105,22 +4180,21 @@ mod openai_tracing_tests {
         );
     }
 
-    /// Verify that "openai_reasoning" obeys the same Responses API reasoning-sequencing rule
-    /// as "openai_responses": reasoning items must not be added to history without a following
-    /// tool call (otherwise OpenAI returns "reasoning was provided without its required
-    /// following item").
+    /// Verify that "openai_reasoning" ALWAYS includes reasoning in conversation history,
+    /// even for text-only responses (no tool calls). The OpenAI Responses API tracks rs_...
+    /// IDs server-side and requires them to be echoed back in every subsequent turn.
     ///
-    /// When the model returns reasoning + text but NO tool calls, the reasoning block must
-    /// NOT appear in the conversation history sent back to the API.
+    /// Contrast with "openai_responses" where reasoning must only be included when paired
+    /// with a tool call.
     #[tokio::test]
-    async fn test_openai_reasoning_excludes_reasoning_from_history_without_tool_calls() {
+    async fn test_openai_reasoning_includes_reasoning_in_history_for_text_only_turns() {
         let test_ctx = TestContextBuilder::new()
             .agent_mode(crate::agent_mode::AgentMode::AutoApprove)
             .build()
             .await;
 
-        // Model returns thinking + text (no tool calls) — the Responses API constraint
-        // requires we must NOT include the reasoning item in the assistant history turn.
+        // Model returns thinking + text (no tool calls). For openai_reasoning, the reasoning
+        // MUST be included in history so OpenAI can find the rs_... item on the next turn.
         let model = MockCompletionModel::new(vec![MockResponse::text_with_thinking(
             "The answer is 4.",
             "Simple arithmetic: 2+2=4",
@@ -4152,9 +4226,11 @@ mod openai_tracing_tests {
         let (response, _reasoning, history, _usage) = result.unwrap();
         assert!(response.contains("4"), "Response should contain the answer");
 
-        // The assistant message in history must NOT contain a Reasoning block when there
-        // were no tool calls — that would cause an OpenAI API error on the next turn.
-        let has_orphaned_reasoning = history.iter().any(|msg| {
+        // For openai_reasoning, the Reasoning block MUST be present in the assistant history
+        // even for text-only turns. OpenAI's server tracks rs_... IDs and requires them on
+        // subsequent turns (failing with "Item 'rs_...' was provided without its required
+        // following item" if a previously-seen rs_ ID is absent from the next request).
+        let has_reasoning_in_history = history.iter().any(|msg| {
             if let rig::completion::Message::Assistant { content, .. } = msg {
                 content
                     .iter()
@@ -4164,9 +4240,9 @@ mod openai_tracing_tests {
             }
         });
         assert!(
-            !has_orphaned_reasoning,
-            "openai_reasoning must not include reasoning in history when there are no tool calls \
-             (would cause: 'reasoning was provided without its required following item')"
+            has_reasoning_in_history,
+            "openai_reasoning MUST include reasoning in history for text-only turns \
+             so OpenAI can find the rs_... item on subsequent turns"
         );
     }
 }
