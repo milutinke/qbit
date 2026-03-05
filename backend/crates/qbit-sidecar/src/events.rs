@@ -652,7 +652,6 @@ impl Checkpoint {
             embedding: None,
         }
     }
-
 }
 
 /// Active session metadata

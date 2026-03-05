@@ -678,5 +678,4 @@ impl LlmClientFactory {
         // Use the unified provider trait to create the client
         qbit_llm_providers::create_client_for_model(ai_provider, model, &settings).await
     }
-
 }

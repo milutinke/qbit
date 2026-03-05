@@ -149,7 +149,6 @@ impl ThinkingConfig {
             thinking_type: "enabled".to_string(),
         }
     }
-
 }
 
 /// Tool definition

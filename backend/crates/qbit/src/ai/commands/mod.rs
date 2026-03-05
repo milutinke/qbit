@@ -203,9 +203,7 @@ pub async fn configure_bridge(bridge: &mut AgentBridge, state: &AppState, _sessi
     bridge.set_memory_file_path(memory_file_path).await;
 
     // Create model factory for sub-agent model overrides
-    let model_factory = qbit_ai::llm_client::LlmClientFactory::new(
-        state.settings_manager.clone(),
-    );
+    let model_factory = qbit_ai::llm_client::LlmClientFactory::new(state.settings_manager.clone());
     let model_factory = std::sync::Arc::new(model_factory);
     bridge.set_model_factory(model_factory);
 
