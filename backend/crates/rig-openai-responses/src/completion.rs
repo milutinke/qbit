@@ -930,20 +930,6 @@ fn convert_assistant_content_to_items(content: &OneOrMany<AssistantContent>) -> 
     items
 }
 
-/// Extract only pure text content from assistant message content.
-/// Tool calls and reasoning are skipped.
-#[allow(dead_code)]
-fn extract_assistant_text_only(content: &OneOrMany<AssistantContent>) -> String {
-    content
-        .iter()
-        .filter_map(|c| match c {
-            AssistantContent::Text(text) => Some(text.text.clone()),
-            _ => None,
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
 /// Convert a rig ToolDefinition to an async-openai Tool.
 fn convert_tool_definition(tool: &ToolDefinition) -> Tool {
     Tool::Function(FunctionTool {
@@ -1104,17 +1090,6 @@ mod tests {
             }
             _ => panic!("Expected EasyMessage"),
         }
-    }
-
-    #[test]
-    fn test_extract_assistant_text_only() {
-        let content = OneOrMany::one(AssistantContent::Text(Text {
-            text: "Hello from assistant!".to_string(),
-        }));
-        assert_eq!(
-            extract_assistant_text_only(&content),
-            "Hello from assistant!"
-        );
     }
 
     #[test]

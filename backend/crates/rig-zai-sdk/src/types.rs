@@ -150,13 +150,6 @@ impl ThinkingConfig {
         }
     }
 
-    /// Create a disabled thinking config
-    #[allow(dead_code)]
-    pub fn disabled() -> Self {
-        Self {
-            thinking_type: "disabled".to_string(),
-        }
-    }
 }
 
 /// Tool definition
