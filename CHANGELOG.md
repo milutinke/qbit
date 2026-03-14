@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.43](https://github.com/qbit-ai/qbit/compare/v0.2.42...v0.2.43) (2026-03-13)
+
+
+### Features
+
+* **home:** add remove recent dirs and delete project actions ([111d1d7](https://github.com/qbit-ai/qbit/commit/111d1d79d5f25141984e4aea51fc88ff94d4b674))
+* **home:** add remove recent dirs and delete project actions ([31689b8](https://github.com/qbit-ai/qbit/commit/31689b8c71f92c8d60734e38bf7c35f4b65af0f4))
+
 ## [0.2.42](https://github.com/qbit-ai/qbit/compare/v0.2.41...v0.2.42) (2026-03-06)
 
 
