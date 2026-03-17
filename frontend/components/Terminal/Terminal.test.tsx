@@ -12,6 +12,7 @@ const {
   mockOpen,
   mockOnResize,
   mockOnDataDispose,
+  mockFit,
 } = vi.hoisted(() => ({
   mockWrite: vi.fn(),
   mockOnData: vi.fn(),
@@ -22,6 +23,7 @@ const {
   mockOpen: vi.fn(),
   mockOnResize: vi.fn(() => ({ dispose: vi.fn() })),
   mockOnDataDispose: vi.fn(),
+  mockFit: vi.fn(),
 }));
 
 // vi.mock is hoisted, so we define classes inline in the factory
@@ -45,7 +47,7 @@ vi.mock("@xterm/xterm", () => {
 vi.mock("@xterm/addon-fit", () => {
   return {
     FitAddon: class {
-      fit = vi.fn();
+      fit = mockFit;
     },
   };
 });
@@ -228,6 +230,119 @@ describe("Terminal", () => {
       });
 
       expect(mockWrite).not.toHaveBeenCalledWith("should not write");
+    });
+
+    describe("reattachment grace period", () => {
+      // Store captured ResizeObserver callback to trigger resizes manually
+      let resizeObserverCallback: (() => void) | null = null;
+
+      // Save originals so we can restore only what we touch (avoids vi.unstubAllGlobals()
+      // which would also tear down globals installed by setup.ts, e.g. crypto.randomUUID).
+      let originalResizeObserver: typeof ResizeObserver;
+
+      beforeEach(() => {
+        originalResizeObserver = globalThis.ResizeObserver;
+
+        // Override ResizeObserver to capture callback and fire synchronously.
+        vi.stubGlobal(
+          "ResizeObserver",
+          class {
+            callback: () => void;
+            constructor(cb: () => void) {
+              this.callback = cb;
+              resizeObserverCallback = cb;
+            }
+            observe = () => {
+              // Fire synchronously on observe (simulates real behavior)
+              this.callback();
+            };
+            unobserve = vi.fn();
+            disconnect = vi.fn();
+          }
+        );
+
+        // Use fake timers so requestAnimationFrame (implemented via setTimeout in jsdom)
+        // is fully under test control. This makes RAF ordering deterministic and avoids
+        // the race where real async setTimeout(0) callbacks complete before assertions run.
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        resizeObserverCallback = null;
+        vi.useRealTimers();
+        // Restore only the globals we overrode — leave everything else (e.g.
+        // crypto.randomUUID from setup.ts) untouched.
+        globalThis.ResizeObserver = originalResizeObserver;
+      });
+
+      // Helper to build a reattachment scenario mock terminal
+      function makeReattachmentMocks() {
+        const mockTerminal = {
+          write: mockWrite,
+          onData: mockOnData,
+          onResize: mockOnResize,
+          focus: mockFocus,
+          dispose: mockDispose,
+          clear: mockClear,
+          loadAddon: mockLoadAddon,
+          open: mockOpen,
+          rows: 24,
+          cols: 80,
+          element: document.createElement("div"),
+        };
+        const mockFitAddonInstance = { fit: mockFit };
+        mockManagerGet.mockReturnValue({
+          terminal: mockTerminal,
+          fitAddon: mockFitAddonInstance,
+        });
+        return { mockTerminal, mockFitAddonInstance };
+      }
+
+      it("should skip fit() during reattachment grace period", async () => {
+        makeReattachmentMocks();
+
+        render(<Terminal sessionId={sessionId} />);
+
+        // Attach fires synchronously; record fit calls immediately after mount
+        expect(mockManagerAttach).toHaveBeenCalled();
+        const fitCallsAfterAttach = mockFit.mock.calls.length;
+
+        // Advance only the first RAF (ResizeObserver debounce, NOT the grace RAFs)
+        // The grace period double-RAF is still pending — grace is still active.
+        act(() => {
+          vi.advanceTimersByTime(0); // fires the ResizeObserver's debounce RAF
+        });
+
+        // Trigger a resize during the grace period — fit() must be suppressed
+        act(() => {
+          resizeObserverCallback?.();
+        });
+        act(() => {
+          vi.advanceTimersByTime(0); // fires the resize debounce RAF
+        });
+
+        // fit() should NOT have been called during the grace period
+        expect(mockFit.mock.calls.length).toBe(fitCallsAfterAttach);
+      });
+
+      it("should call fit() after grace period ends", async () => {
+        makeReattachmentMocks();
+
+        render(<Terminal sessionId={sessionId} />);
+
+        expect(mockManagerAttach).toHaveBeenCalled();
+        mockFit.mockClear();
+
+        // Drain all pending timers (ResizeObserver debounce + both grace-period RAFs).
+        // vi.runAllTimers() repeatedly fires queued setTimeout callbacks (which back
+        // jsdom's requestAnimationFrame) until none remain, so the deferred fit() inside
+        // the double-RAF closure is guaranteed to execute.
+        act(() => {
+          vi.runAllTimers();
+        });
+
+        expect(mockFit).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

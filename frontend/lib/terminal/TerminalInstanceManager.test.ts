@@ -4,10 +4,14 @@ import { TerminalInstanceManager } from "@/lib/terminal/TerminalInstanceManager"
 describe("TerminalInstanceManager", () => {
   beforeAll(() => {
     // JSDOM may not provide requestAnimationFrame; manager uses it for safeFit.
+    // Use setTimeout(0) so callbacks fire asynchronously, which is required for
+    // the deferred-fit test to correctly observe that fit() is NOT called synchronously.
     if (typeof globalThis.requestAnimationFrame !== "function") {
+      let rafId = 0;
       vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-        cb(0);
-        return 1;
+        const id = ++rafId;
+        setTimeout(() => cb(performance.now()), 0);
+        return id;
       });
     }
 
@@ -83,5 +87,59 @@ describe("TerminalInstanceManager", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Test mocks don't need full type implementation
     TerminalInstanceManager.register(sessionId, terminal as any, fitAddon as any);
     expect(() => TerminalInstanceManager.detach(sessionId)).not.toThrow();
+  });
+
+  it("defers fit() call during reattachment to avoid race condition", async () => {
+    const sessionId = "session-3";
+
+    const terminalEl = document.createElement("div");
+    terminalEl.className = "xterm";
+
+    const terminal = {
+      element: terminalEl,
+      open: vi.fn(),
+      dispose: vi.fn(),
+    };
+
+    const fitAddon = {
+      fit: vi.fn(),
+    };
+
+    TerminalInstanceManager.register(
+      sessionId,
+      terminal as unknown as import("@xterm/xterm").Terminal,
+      fitAddon as unknown as import("@xterm/addon-fit").FitAddon
+    );
+
+    const containerA = document.createElement("div");
+    const containerB = document.createElement("div");
+    document.body.appendChild(containerA);
+    document.body.appendChild(containerB);
+
+    // Initial attach
+    TerminalInstanceManager.attachToContainer(sessionId, containerA);
+
+    // Clear previous fit calls
+    fitAddon.fit.mockClear();
+
+    // Detach and reattach (simulating pane restructuring)
+    TerminalInstanceManager.detach(sessionId);
+    TerminalInstanceManager.attachToContainer(sessionId, containerB);
+
+    // fit() should NOT be called synchronously during reattachment
+    // It should be deferred to the next animation frame
+    expect(fitAddon.fit).not.toHaveBeenCalled();
+
+    // Wait for RAF to fire
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+
+    // Now fit() should have been called
+    expect(fitAddon.fit).toHaveBeenCalled();
+
+    // Cleanup
+    containerA.remove();
+    containerB.remove();
   });
 });

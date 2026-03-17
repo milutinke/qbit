@@ -1,6 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getSettingsCached, invalidateSettingsCache, SETTINGS_CACHE_TTL_MS } from "./settings";
+import type { QbitSettings } from "./settings";
+import {
+  getSettingsCached,
+  invalidateSettingsCache,
+  reloadSettings,
+  resetSettings,
+  SETTINGS_CACHE_TTL_MS,
+  setSetting,
+  updateSettings,
+} from "./settings";
 
 // The invoke mock is set up in vitest.config.ts
 // We'll mock it per-test to control behavior
@@ -84,6 +93,85 @@ describe("Settings Cache", () => {
       // Third call - should refresh
       await getSettingsCached();
       expect(invoke).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("cache invalidation after mutations", () => {
+    // For each mutation test: prime the cache, call a mutator, then assert the next
+    // getSettingsCached() triggers a fresh invoke("get_settings").
+    // We also stub the mutation commands explicitly so the default mock doesn't emit
+    // console.warn for unhandled commands, and so tests fail if a wrong command name is used.
+
+    beforeEach(() => {
+      vi.mocked(invoke).mockImplementation(async (command: string) => {
+        switch (command) {
+          case "get_settings":
+            return { terminal: { fullterm_commands: [] }, ai: {} };
+          case "update_settings":
+          case "set_setting":
+          case "reset_settings":
+          case "reload_settings":
+            return undefined;
+          default:
+            throw new Error(`Unexpected invoke command in mutation tests: ${command}`);
+        }
+      });
+    });
+
+    it("updateSettings should invalidate the cache", async () => {
+      // Prime the cache
+      await getSettingsCached();
+      expect(invoke).toHaveBeenCalledWith("get_settings");
+      const callsBefore = vi.mocked(invoke).mock.calls.length;
+
+      // Mutate
+      await updateSettings({} as QbitSettings);
+      expect(invoke).toHaveBeenCalledWith("update_settings", { settings: {} });
+
+      // Next read must bypass cache
+      await getSettingsCached();
+      const calls = vi.mocked(invoke).mock.calls;
+      expect(calls.length).toBeGreaterThan(callsBefore);
+      expect(calls[calls.length - 1]?.[0]).toBe("get_settings");
+    });
+
+    it("setSetting should invalidate the cache", async () => {
+      await getSettingsCached();
+      const callsBefore = vi.mocked(invoke).mock.calls.length;
+
+      await setSetting("ui.theme", "dark");
+      expect(invoke).toHaveBeenCalledWith("set_setting", { key: "ui.theme", value: "dark" });
+
+      await getSettingsCached();
+      const calls = vi.mocked(invoke).mock.calls;
+      expect(calls.length).toBeGreaterThan(callsBefore);
+      expect(calls[calls.length - 1]?.[0]).toBe("get_settings");
+    });
+
+    it("resetSettings should invalidate the cache", async () => {
+      await getSettingsCached();
+      const callsBefore = vi.mocked(invoke).mock.calls.length;
+
+      await resetSettings();
+      expect(invoke).toHaveBeenCalledWith("reset_settings");
+
+      await getSettingsCached();
+      const calls = vi.mocked(invoke).mock.calls;
+      expect(calls.length).toBeGreaterThan(callsBefore);
+      expect(calls[calls.length - 1]?.[0]).toBe("get_settings");
+    });
+
+    it("reloadSettings should invalidate the cache", async () => {
+      await getSettingsCached();
+      const callsBefore = vi.mocked(invoke).mock.calls.length;
+
+      await reloadSettings();
+      expect(invoke).toHaveBeenCalledWith("reload_settings");
+
+      await getSettingsCached();
+      const calls = vi.mocked(invoke).mock.calls;
+      expect(calls.length).toBeGreaterThan(callsBefore);
+      expect(calls[calls.length - 1]?.[0]).toBe("get_settings");
     });
   });
 });

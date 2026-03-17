@@ -106,8 +106,12 @@ class TerminalInstanceManagerClass {
    * Attach terminal to a container element.
    * If already attached elsewhere, moves the terminal's DOM to the new container.
    * This is the key operation that allows terminals to survive remounts.
+   *
+   * @param skipFit - When true, suppresses the internal safeFit() call after attaching.
+   *   Use this when the caller will manage its own deferred fit (e.g. Terminal component
+   *   during reattachment, where a double-RAF grace period controls when fit() runs).
    */
-  attachToContainer(sessionId: string, container: HTMLElement): boolean {
+  attachToContainer(sessionId: string, container: HTMLElement, { skipFit = false } = {}): boolean {
     const instance = this.instances.get(sessionId);
     if (!instance) {
       return false;
@@ -116,8 +120,10 @@ class TerminalInstanceManagerClass {
     const { terminal, fitAddon, currentContainer } = instance;
 
     if (currentContainer === container) {
-      // Already attached to this container, just fit
-      this.safeFit(fitAddon);
+      // Already attached to this container, just fit (unless caller is handling it)
+      if (!skipFit) {
+        this.safeFit(fitAddon);
+      }
       return true;
     }
 
@@ -134,8 +140,11 @@ class TerminalInstanceManagerClass {
     // Update the tracked container
     instance.currentContainer = container;
 
-    // Fit to new container size (deferred to allow renderer to initialize)
-    this.safeFit(fitAddon);
+    // Fit to new container size (deferred to allow renderer to initialize).
+    // Skipped when the caller manages its own fit scheduling (e.g. reattachment grace period).
+    if (!skipFit) {
+      this.safeFit(fitAddon);
+    }
 
     return true;
   }
