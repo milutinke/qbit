@@ -151,8 +151,11 @@ export function Terminal({ sessionId }: TerminalProps) {
       // the WebGL renderer has initialized its dimensions after the DOM move
       reattachmentGraceRef.current = true;
 
-      // Move terminal DOM to new container
-      TerminalInstanceManager.attachToContainer(sessionId, containerRef.current);
+      // Move terminal DOM to new container.
+      // skipFit: true because we manage our own deferred fit below via double-RAF.
+      // Without this, the manager's internal safeFit (single RAF) would fire before
+      // the grace period ends, defeating the purpose of the race-condition guard.
+      TerminalInstanceManager.attachToContainer(sessionId, containerRef.current, { skipFit: true });
 
       // Clear the grace period after a double requestAnimationFrame (two RAF cycles)
       // This ensures the renderer has had time to initialize after the DOM move
