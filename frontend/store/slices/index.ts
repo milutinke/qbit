@@ -47,6 +47,19 @@ export {
   selectUnreadNotificationCount,
 } from "./notification";
 
+// Focus slice
+export {
+  createFocusSlice,
+  defaultFocusModeDisplaySettings,
+  initialFocusState,
+  type FocusActions,
+  type FocusModeDisplaySettings,
+  type FocusSlice,
+  type FocusState,
+  selectFocusModeDisplaySettings,
+  selectFocusModeEnabled,
+} from "./focus";
+
 // Panel slice
 export {
   createPanelSlice,

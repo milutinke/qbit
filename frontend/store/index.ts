@@ -26,15 +26,18 @@ import {
   type ContextMetrics,
   type ContextSlice,
   createContextSlice,
+  createFocusSlice,
   createGitSlice,
   createNotificationSlice,
   createPanelSlice,
+  type FocusSlice,
   type GitSlice,
   type Notification,
   type NotificationSlice,
   type NotificationType,
   type PanelSlice,
   selectContextMetrics,
+  selectFocusModeEnabled,
 } from "./slices";
 
 export type { ApprovalPattern, ReasoningEffort, RiskLevel };
@@ -375,7 +378,7 @@ export interface PendingCommand {
   workingDirectory: string;
 }
 
-interface QbitState extends ContextSlice, GitSlice, NotificationSlice, PanelSlice {
+interface QbitState extends ContextSlice, FocusSlice, GitSlice, NotificationSlice, PanelSlice {
   // App focus/visibility state
   appIsFocused: boolean;
   appIsVisible: boolean;
@@ -675,6 +678,7 @@ export const useStore = create<QbitState>()(
     immer((set, get, _store) => ({
       // Slices
       ...createContextSlice(set, get),
+      ...createFocusSlice(set, get),
       ...createGitSlice(set, get),
       ...createNotificationSlice(set, get),
       ...createPanelSlice(set, get),

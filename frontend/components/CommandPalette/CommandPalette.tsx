@@ -3,6 +3,7 @@ import {
   Clock,
   Columns,
   Database,
+  Eye,
   FilePenLine,
   FileSearch,
   FileText,
@@ -51,6 +52,7 @@ interface CommandPaletteProps {
   onOpenContextPanel?: () => void;
   onOpenSettings?: () => void;
   onOpenQuickOpen?: () => void;
+  onToggleFocusMode?: () => void;
   // Pane management
   onSplitPaneRight?: () => void;
   onSplitPaneDown?: () => void;
@@ -82,6 +84,7 @@ export function CommandPalette({
   onOpenContextPanel,
   onOpenSettings,
   onOpenQuickOpen,
+  onToggleFocusMode,
   onSplitPaneRight,
   onSplitPaneDown,
   onClosePane,
@@ -222,6 +225,13 @@ export function CommandPalette({
               <Monitor className="mr-2 h-4 w-4" />
               <span>Toggle Full Terminal</span>
               <CommandShortcut>⌘⇧F</CommandShortcut>
+            </CommandItem>
+          )}
+          {onToggleFocusMode && (
+            <CommandItem onSelect={() => runCommand(onToggleFocusMode)}>
+              <Eye className="mr-2 h-4 w-4" />
+              <span>Focus Mode: Toggle</span>
+              <CommandShortcut>⌘.</CommandShortcut>
             </CommandItem>
           )}
           {activeSessionId && (

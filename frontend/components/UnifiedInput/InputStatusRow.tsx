@@ -43,6 +43,7 @@ import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { isMockBrowserMode } from "@/mocks";
 import { useContextMetrics, useInputMode, useSessionAiConfig, useStore } from "@/store";
+import { selectFocusModeDisplaySettings, selectFocusModeEnabled } from "@/store/slices";
 
 interface InputStatusRowProps {
   sessionId: string;
@@ -234,6 +235,8 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
   const inputMode = useInputMode(sessionId);
   const setInputMode = useStore((state) => state.setInputMode);
   const setSessionAiConfig = useStore((state) => state.setSessionAiConfig);
+  const focusMode = useStore(selectFocusModeEnabled);
+  const focusDisplay = useStore(selectFocusModeDisplaySettings);
 
   // Auto-hide labels after a delay in agent mode
   const [showLabels, setShowLabels] = useState(true);
@@ -657,6 +660,22 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
       {/* Left side */}
       <div className="flex items-center gap-2">
         {/* Mode segmented control - icons only */}
+        {focusMode && !focusDisplay.showInputModeToggle && inputMode !== "auto" ? (
+          <div className="p-0.5 border border-transparent rounded-lg">
+            <button
+              type="button"
+              aria-label={inputMode === "terminal" ? "Terminal mode" : "AI mode"}
+              title={inputMode === "terminal" ? "Terminal" : "AI"}
+              className="h-6 w-6 flex items-center justify-center rounded-md bg-accent/15 text-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
+            >
+              {inputMode === "terminal" ? (
+                <Terminal className="w-3.5 h-3.5" />
+              ) : (
+                <Bot className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        ) : (
         <div className="flex items-center rounded-lg bg-muted/50 p-0.5 border border-[var(--border-subtle)]/50">
           <button
             type="button"
@@ -689,12 +708,13 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
             <Bot className="w-3.5 h-3.5" />
           </button>
         </div>
+        )}
 
         {/* Divider */}
-        <div className="h-4 w-px bg-[var(--border-medium)]" />
+        {(!focusMode || focusDisplay.showStatusBadge) && <div className="h-4 w-px bg-[var(--border-medium)]" />}
 
         {/* Model selector badge */}
-        {status === "disconnected" ? (
+        {(!focusMode || focusDisplay.showStatusBadge) && (status === "disconnected" ? (
           <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-muted/60 text-muted-foreground flex items-center border border-transparent">
             <Cpu className="w-3.5 h-3.5" />
             <span>AI Disconnected</span>
@@ -992,13 +1012,13 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
+        ))}
 
         {/* Agent Mode Selector */}
-        {status === "ready" && <AgentModeSelector sessionId={sessionId} showLabel={showLabels} />}
+        {(!focusMode || focusDisplay.showAgentModeSelector) && status === "ready" && <AgentModeSelector sessionId={sessionId} showLabel={showLabels} />}
 
         {/* Context utilization indicator */}
-        {contextMetrics.maxTokens > 0 ? (
+        {(!focusMode || focusDisplay.showContextUsage) && (contextMetrics.maxTokens > 0 ? (
           <Popover>
             <PopoverTrigger asChild>
               <button
@@ -1067,7 +1087,7 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
             <Gauge className="w-3.5 h-3.5" />
             <span>0%</span>
           </button>
-        )}
+        ))}
 
         {/* Langfuse tracing indicator with stats */}
         {langfuseActive && (
@@ -1120,7 +1140,7 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
         )}
 
         {/* MCP servers indicator */}
-        {hasMcpServers && (
+        {(!focusMode || focusDisplay.showMcpBadge) && hasMcpServers && (
           <Popover>
             <PopoverTrigger asChild>
               <button

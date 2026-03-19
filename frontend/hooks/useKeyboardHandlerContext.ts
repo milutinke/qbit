@@ -198,6 +198,13 @@ export function createKeyboardHandler(
       return;
     }
 
+    // Cmd+. for focus mode toggle
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === ".") {
+      e.preventDefault();
+      useStore.getState().toggleFocusMode();
+      return;
+    }
+
     // Cmd+P for quick open file (without Shift)
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "p") {
       e.preventDefault();

@@ -5,6 +5,7 @@ import {
   FileCode,
   FolderCode,
   Loader2,
+  Paintbrush,
   Puzzle,
   Server,
   Shield,
@@ -47,6 +48,9 @@ const ProviderSettings = lazy(() =>
 const TerminalSettings = lazy(() =>
   import("./TerminalSettings").then((m) => ({ default: m.TerminalSettings }))
 );
+const AppearanceSettings = lazy(() =>
+  import("./AppearanceSettings").then((m) => ({ default: m.AppearanceSettings }))
+);
 const McpSettings = lazy(() => import("./McpSettings").then((m) => ({ default: m.McpSettings })));
 
 interface SettingsDialogProps {
@@ -63,6 +67,7 @@ type SettingsSection =
   | "mcp"
   | "codebases"
   | "notifications"
+  | "appearance"
   | "advanced";
 
 interface NavItem {
@@ -120,6 +125,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Notifications",
     icon: <Bell className="w-4 h-4" />,
     description: "System notification settings",
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    icon: <Paintbrush className="w-4 h-4" />,
+    description: "Theme and focus mode",
   },
   {
     id: "advanced",
@@ -241,6 +252,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             onChange={(notifications) => updateSection("notifications", notifications)}
           />
         );
+      case "appearance":
+        return <AppearanceSettings />;
       case "advanced":
         return (
           <AdvancedSettings

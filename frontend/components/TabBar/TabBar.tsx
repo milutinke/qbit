@@ -51,6 +51,7 @@ import { liveTerminalManager, TerminalInstanceManager } from "@/lib/terminal";
 import { cn } from "@/lib/utils";
 import { isMockBrowserMode } from "@/mocks";
 import { useStore } from "@/store";
+import { selectFocusModeDisplaySettings } from "@/store/slices";
 import { type TabItemState, useTabBarState } from "@/store/selectors/tab-bar";
 
 const startDrag = async (e: React.MouseEvent) => {
@@ -330,9 +331,11 @@ export const TabBar = React.memo(function TabBar() {
 
         {/* Notification widget */}
         {/* biome-ignore lint/a11y/noStaticElementInteractions: div is used to prevent drag propagation to notification widget */}
-        <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <NotificationWidget />
-        </div>
+        {(!useStore((state) => state.focusModeEnabled) || useStore(selectFocusModeDisplaySettings).showNotificationBell) && (
+          <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+            <NotificationWidget />
+          </div>
+        )}
       </div>
 
       {/* Convert to Pane Modal */}

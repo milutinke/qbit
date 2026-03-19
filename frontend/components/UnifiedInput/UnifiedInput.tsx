@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAgentMessages, useSessionAiConfig, useStore } from "@/store";
 import { useUnifiedInputState } from "@/store/selectors/unified-input";
+import { selectFocusModeDisplaySettings, selectFocusModeEnabled } from "@/store/slices";
 import { BlockCaret } from "./BlockCaret";
 import { ImageAttachment, readFileAsBase64 } from "./ImageAttachment";
 import { InputStatusRow } from "./InputStatusRow";
@@ -1509,7 +1510,9 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
         </div>
 
         {/* Status row - model selector, token usage */}
-        <InputStatusRow sessionId={sessionId} />
+        {(!useStore(selectFocusModeEnabled) || useStore(selectFocusModeDisplaySettings).showStatusBar) && (
+          <InputStatusRow sessionId={sessionId} />
+        )}
       </div>
     </>
   );
