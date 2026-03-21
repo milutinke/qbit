@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 # Core
-rig-core = "^0.29.0"
+rig-core = "^0.31.0"
 async-openai = { version = "0.32", default-features = false, features = ["responses", "rustls"] }
 
 # Async
