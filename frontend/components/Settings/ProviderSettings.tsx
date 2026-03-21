@@ -258,11 +258,19 @@ function OpenRouterProviderPreferencesSection({
   // Helper to convert array to comma-separated string
   const fromArray = (arr?: string[] | null): string => (arr || []).join(", ");
 
+  // Check if any preferences are configured
+  const hasPrefs = prefs && Object.values(prefs).some((v) => v != null);
+
   return (
-    <Collapsible>
+    <Collapsible defaultOpen={hasPrefs}>
       <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
         Provider Preferences
+        {hasPrefs && (
+          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent">
+            Active
+          </span>
+        )}
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-2 space-y-3">
         <p className="text-xs text-muted-foreground">
@@ -286,7 +294,7 @@ function OpenRouterProviderPreferencesSection({
             id="or-order"
             value={fromArray(prefs?.order)}
             onChange={(e) => updatePref("order", toArray(e.target.value))}
-            placeholder="DeepInfra, DeepSeek, Chutes"
+            placeholder="deepinfra, deepseek, chutes"
           />
           <p className="text-[11px] text-muted-foreground">Comma-separated. Try these providers first, in order.</p>
         </div>
@@ -300,7 +308,7 @@ function OpenRouterProviderPreferencesSection({
             id="or-only"
             value={fromArray(prefs?.only)}
             onChange={(e) => updatePref("only", toArray(e.target.value))}
-            placeholder="DeepInfra, AtlasCloud"
+            placeholder="deepinfra, atlascloud"
           />
           <p className="text-[11px] text-muted-foreground">Comma-separated. Only use these providers.</p>
         </div>
@@ -314,7 +322,7 @@ function OpenRouterProviderPreferencesSection({
             id="or-ignore"
             value={fromArray(prefs?.ignore)}
             onChange={(e) => updatePref("ignore", toArray(e.target.value))}
-            placeholder="Google Vertex"
+            placeholder="google vertex"
           />
           <p className="text-[11px] text-muted-foreground">Comma-separated. Never use these providers.</p>
         </div>

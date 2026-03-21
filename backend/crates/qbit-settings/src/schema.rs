@@ -358,8 +358,21 @@ pub struct OpenRouterSettings {
 
     /// Provider preferences for routing and filtering (optional).
     /// See https://openrouter.ai/docs/guides/routing/provider-selection
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "provider_preferences_is_empty"
+    )]
     pub provider_preferences: Option<OpenRouterProviderPreferences>,
+}
+
+/// Custom skip-serialization check: skip only if None or all-empty.
+/// This ensures non-empty preferences are ALWAYS serialized, preventing
+/// data loss when the settings file is rewritten (e.g., on window resize).
+fn provider_preferences_is_empty(prefs: &Option<OpenRouterProviderPreferences>) -> bool {
+    match prefs {
+        None => true,
+        Some(p) => p.is_empty(),
+    }
 }
 
 /// OpenRouter provider preferences for routing, filtering, and prioritization.
@@ -372,17 +385,17 @@ pub struct OpenRouterSettings {
 #[serde(default)]
 pub struct OpenRouterProviderPreferences {
     /// Provider priority ordering. Try these providers first, in order.
-    /// Example: ["DeepInfra", "DeepSeek", "Chutes"]
+    /// Example: ["deepinfra", "deepseek", "chutes"]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Vec<String>>,
 
     /// Hard allowlist: only use these providers.
-    /// Example: ["DeepInfra", "AtlasCloud"]
+    /// Example: ["deepinfra", "atlascloud"]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub only: Option<Vec<String>>,
 
     /// Blocklist: never use these providers.
-    /// Example: ["Google Vertex"]
+    /// Example: ["google vertex"]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore: Option<Vec<String>>,
 
@@ -457,7 +470,7 @@ impl OpenRouterProviderPreferences {
     /// ```json
     /// {
     ///   "provider": {
-    ///     "order": ["DeepInfra", "DeepSeek"],
+    ///     "order": ["deepinfra", "deepseek"],
     ///     "sort": "throughput",
     ///     "quantizations": ["fp8"]
     ///   }
@@ -1590,21 +1603,21 @@ mod tests {
     #[test]
     fn test_openrouter_preferences_not_empty_with_order() {
         let mut prefs = OpenRouterProviderPreferences::default();
-        prefs.order = Some(vec!["DeepInfra".to_string()]);
+        prefs.order = Some(vec!["deepinfra".to_string()]);
         assert!(!prefs.is_empty());
     }
 
     #[test]
     fn test_openrouter_preferences_to_provider_json_basic() {
         let mut prefs = OpenRouterProviderPreferences::default();
-        prefs.order = Some(vec!["DeepInfra".to_string(), "DeepSeek".to_string()]);
+        prefs.order = Some(vec!["deepinfra".to_string(), "deepseek".to_string()]);
         prefs.sort = Some("throughput".to_string());
 
         let json = prefs.to_provider_json();
         let provider = json.get("provider").unwrap().as_object().unwrap();
         assert_eq!(
             provider.get("order").unwrap(),
-            &serde_json::json!(["DeepInfra", "DeepSeek"])
+            &serde_json::json!(["deepinfra", "deepseek"])
         );
         assert_eq!(
             provider.get("sort").unwrap(),
@@ -1615,8 +1628,8 @@ mod tests {
     #[test]
     fn test_openrouter_preferences_to_provider_json_filters() {
         let mut prefs = OpenRouterProviderPreferences::default();
-        prefs.only = Some(vec!["DeepInfra".to_string()]);
-        prefs.ignore = Some(vec!["Google Vertex".to_string()]);
+        prefs.only = Some(vec!["deepinfra".to_string()]);
+        prefs.ignore = Some(vec!["google vertex".to_string()]);
         prefs.allow_fallbacks = Some(false);
         prefs.zdr = Some(true);
         prefs.data_collection = Some("deny".to_string());
@@ -1625,11 +1638,11 @@ mod tests {
         let provider = json.get("provider").unwrap().as_object().unwrap();
         assert_eq!(
             provider.get("only").unwrap(),
-            &serde_json::json!(["DeepInfra"])
+            &serde_json::json!(["deepinfra"])
         );
         assert_eq!(
             provider.get("ignore").unwrap(),
-            &serde_json::json!(["Google Vertex"])
+            &serde_json::json!(["google vertex"])
         );
         assert_eq!(provider.get("allow_fallbacks").unwrap(), &serde_json::json!(false));
         assert_eq!(provider.get("zdr").unwrap(), &serde_json::json!(true));
@@ -1686,10 +1699,42 @@ mod tests {
     }
 
     #[test]
+    fn test_openrouter_preferences_skips_empty_some_in_serialization() {
+        let settings = OpenRouterSettings {
+            api_key: Some("test-key".to_string()),
+            show_in_selector: true,
+            provider_preferences: Some(OpenRouterProviderPreferences::default()),
+        };
+        let toml_str = toml::to_string_pretty(&settings).unwrap();
+        // provider_preferences is Some but empty (all fields None), so it should not appear
+        assert!(!toml_str.contains("provider_preferences"));
+    }
+
+    #[test]
+    fn test_openrouter_preferences_serializes_when_has_values() {
+        let settings = OpenRouterSettings {
+            api_key: Some("test-key".to_string()),
+            show_in_selector: true,
+            provider_preferences: Some(OpenRouterProviderPreferences {
+                sort: Some("throughput".to_string()),
+                ..Default::default()
+            }),
+        };
+        let toml_str = toml::to_string_pretty(&settings).unwrap();
+        // provider_preferences has values, so it MUST appear in output
+        assert!(
+            toml_str.contains("provider_preferences"),
+            "Non-empty provider_preferences was dropped! Output:\n{}",
+            toml_str
+        );
+        assert!(toml_str.contains("throughput"));
+    }
+
+    #[test]
     fn test_openrouter_preferences_round_trip_toml() {
         let toml_str = r#"
             [provider_preferences]
-            order = ["DeepInfra", "DeepSeek"]
+            order = ["deepinfra", "deepseek"]
             sort = "throughput"
             quantizations = ["fp8"]
             zdr = true
@@ -1703,7 +1748,7 @@ mod tests {
         let prefs = settings.provider_preferences.unwrap();
         assert_eq!(
             prefs.order,
-            Some(vec!["DeepInfra".to_string(), "DeepSeek".to_string()])
+            Some(vec!["deepinfra".to_string(), "deepseek".to_string()])
         );
         assert_eq!(prefs.sort, Some("throughput".to_string()));
         assert_eq!(
@@ -1722,12 +1767,12 @@ mod tests {
         // Only some fields set - others should be None
         let toml_str = r#"
             [provider_preferences]
-            order = ["DeepInfra"]
+            order = ["deepinfra"]
         "#;
 
         let settings: OpenRouterSettings = toml::from_str(toml_str).unwrap();
         let prefs = settings.provider_preferences.unwrap();
-        assert_eq!(prefs.order, Some(vec!["DeepInfra".to_string()]));
+        assert_eq!(prefs.order, Some(vec!["deepinfra".to_string()]));
         assert!(prefs.only.is_none());
         assert!(prefs.ignore.is_none());
         assert!(prefs.sort.is_none());
@@ -1746,7 +1791,7 @@ mod tests {
             api_key = "sk-or-v1-test"
 
             [ai.openrouter.provider_preferences]
-            order = ["DeepInfra", "DeepSeek"]
+            order = ["deepinfra", "deepseek"]
             sort = "throughput"
             quantizations = ["fp8"]
         "#;
@@ -1757,9 +1802,89 @@ mod tests {
         let prefs = settings.ai.openrouter.provider_preferences.unwrap();
         assert_eq!(
             prefs.order,
-            Some(vec!["DeepInfra".to_string(), "DeepSeek".to_string()])
+            Some(vec!["deepinfra".to_string(), "deepseek".to_string()])
         );
         assert_eq!(prefs.sort, Some("throughput".to_string()));
         assert!(!prefs.is_empty());
+    }
+
+    #[test]
+    fn test_openrouter_preferences_full_round_trip_preserves_prefs() {
+        // Simulate: user has provider_preferences set in settings.toml
+        let toml_str = r#"
+            [ai]
+            default_provider = "openrouter"
+            default_model = "deepseek/deepseek-v3.2"
+
+            [ai.openrouter]
+            api_key = "sk-or-v1-test"
+
+            [ai.openrouter.provider_preferences]
+            order = ["deepinfra", "deepseek"]
+            sort = "throughput"
+        "#;
+
+        // Step 1: Load from TOML (simulating app startup)
+        let settings: QbitSettings = toml::from_str(toml_str).unwrap();
+        assert!(settings.ai.openrouter.provider_preferences.is_some());
+
+        // Step 2: Serialize back to TOML (simulating save_window_state)
+        let serialized = toml::to_string_pretty(&settings).unwrap();
+
+        // Step 3: Verify the provider_preferences section is preserved
+        assert!(
+            serialized.contains("provider_preferences"),
+            "provider_preferences section was lost during round-trip! Serialized:\n{}",
+            serialized
+        );
+
+        // Step 4: Parse back and verify data integrity
+        let reloaded: QbitSettings = toml::from_str(&serialized).unwrap();
+        let prefs = reloaded.ai.openrouter.provider_preferences.unwrap();
+        assert_eq!(
+            prefs.order,
+            Some(vec!["deepinfra".to_string(), "deepseek".to_string()])
+        );
+        assert_eq!(prefs.sort, Some("throughput".to_string()));
+    }
+
+    #[test]
+    fn test_openrouter_preferences_json_round_trip_preserves_prefs() {
+        // Simulate: settings go through JSON (Tauri frontend<->backend)
+        let toml_str = r#"
+            [ai]
+            default_provider = "openrouter"
+
+            [ai.openrouter]
+            api_key = "sk-or-v1-test"
+
+            [ai.openrouter.provider_preferences]
+            order = ["deepinfra"]
+            sort = "throughput"
+        "#;
+
+        // Step 1: Load from TOML
+        let settings: QbitSettings = toml::from_str(toml_str).unwrap();
+
+        // Step 2: Serialize to JSON (simulating Tauri sending to frontend)
+        let json_str = serde_json::to_string(&settings).unwrap();
+
+        // Step 3: Deserialize from JSON (simulating Tauri receiving from frontend)
+        let from_json: QbitSettings = serde_json::from_str(&json_str).unwrap();
+
+        // Step 4: Serialize to TOML (simulating settings save)
+        let toml_output = toml::to_string_pretty(&from_json).unwrap();
+
+        // Step 5: Verify provider_preferences survived the round trip
+        assert!(
+            toml_output.contains("provider_preferences"),
+            "provider_preferences lost during JSON round-trip! TOML output:\n{}",
+            toml_output
+        );
+
+        let final_settings: QbitSettings = toml::from_str(&toml_output).unwrap();
+        let prefs = final_settings.ai.openrouter.provider_preferences.unwrap();
+        assert_eq!(prefs.order, Some(vec!["deepinfra".to_string()]));
+        assert_eq!(prefs.sort, Some("throughput".to_string()));
     }
 }
