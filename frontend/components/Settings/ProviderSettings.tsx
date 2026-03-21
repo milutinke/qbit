@@ -294,7 +294,7 @@ function OpenRouterProviderPreferencesSection({
             id="or-order"
             value={fromArray(prefs?.order)}
             onChange={(e) => updatePref("order", toArray(e.target.value))}
-            placeholder="deepinfra, deepseek, chutes"
+            placeholder="deepinfra, deepseek"
           />
           <p className="text-[11px] text-muted-foreground">Comma-separated. Try these providers first, in order.</p>
         </div>

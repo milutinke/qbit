@@ -385,7 +385,7 @@ fn provider_preferences_is_empty(prefs: &Option<OpenRouterProviderPreferences>) 
 #[serde(default)]
 pub struct OpenRouterProviderPreferences {
     /// Provider priority ordering. Try these providers first, in order.
-    /// Example: ["deepinfra", "deepseek", "chutes"]
+    /// Example: ["deepinfra", "deepseek"]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order: Option<Vec<String>>,
 
