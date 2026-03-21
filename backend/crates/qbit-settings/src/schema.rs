@@ -1570,4 +1570,196 @@ mod tests {
         // color is None, so it should not appear in output (skip_serializing_if)
         assert!(!toml_str.contains("color"));
     }
+
+    // =========================================================================
+    // OpenRouter Provider Preferences Tests
+    // =========================================================================
+
+    #[test]
+    fn test_openrouter_preferences_default_is_none() {
+        let settings = QbitSettings::default();
+        assert!(settings.ai.openrouter.provider_preferences.is_none());
+    }
+
+    #[test]
+    fn test_openrouter_preferences_is_empty() {
+        let prefs = OpenRouterProviderPreferences::default();
+        assert!(prefs.is_empty());
+    }
+
+    #[test]
+    fn test_openrouter_preferences_not_empty_with_order() {
+        let mut prefs = OpenRouterProviderPreferences::default();
+        prefs.order = Some(vec!["DeepInfra".to_string()]);
+        assert!(!prefs.is_empty());
+    }
+
+    #[test]
+    fn test_openrouter_preferences_to_provider_json_basic() {
+        let mut prefs = OpenRouterProviderPreferences::default();
+        prefs.order = Some(vec!["DeepInfra".to_string(), "DeepSeek".to_string()]);
+        prefs.sort = Some("throughput".to_string());
+
+        let json = prefs.to_provider_json();
+        let provider = json.get("provider").unwrap().as_object().unwrap();
+        assert_eq!(
+            provider.get("order").unwrap(),
+            &serde_json::json!(["DeepInfra", "DeepSeek"])
+        );
+        assert_eq!(
+            provider.get("sort").unwrap(),
+            &serde_json::json!("throughput")
+        );
+    }
+
+    #[test]
+    fn test_openrouter_preferences_to_provider_json_filters() {
+        let mut prefs = OpenRouterProviderPreferences::default();
+        prefs.only = Some(vec!["DeepInfra".to_string()]);
+        prefs.ignore = Some(vec!["Google Vertex".to_string()]);
+        prefs.allow_fallbacks = Some(false);
+        prefs.zdr = Some(true);
+        prefs.data_collection = Some("deny".to_string());
+
+        let json = prefs.to_provider_json();
+        let provider = json.get("provider").unwrap().as_object().unwrap();
+        assert_eq!(
+            provider.get("only").unwrap(),
+            &serde_json::json!(["DeepInfra"])
+        );
+        assert_eq!(
+            provider.get("ignore").unwrap(),
+            &serde_json::json!(["Google Vertex"])
+        );
+        assert_eq!(provider.get("allow_fallbacks").unwrap(), &serde_json::json!(false));
+        assert_eq!(provider.get("zdr").unwrap(), &serde_json::json!(true));
+        assert_eq!(
+            provider.get("data_collection").unwrap(),
+            &serde_json::json!("deny")
+        );
+    }
+
+    #[test]
+    fn test_openrouter_preferences_to_provider_json_max_price() {
+        let mut prefs = OpenRouterProviderPreferences::default();
+        prefs.max_price_prompt = Some(0.30);
+        prefs.max_price_completion = Some(0.50);
+
+        let json = prefs.to_provider_json();
+        let provider = json.get("provider").unwrap().as_object().unwrap();
+        let max_price = provider.get("max_price").unwrap().as_object().unwrap();
+        assert_eq!(max_price.get("prompt").unwrap(), &serde_json::json!(0.30));
+        assert_eq!(max_price.get("completion").unwrap(), &serde_json::json!(0.50));
+    }
+
+    #[test]
+    fn test_openrouter_preferences_to_provider_json_quantizations() {
+        let mut prefs = OpenRouterProviderPreferences::default();
+        prefs.quantizations = Some(vec!["fp8".to_string(), "fp16".to_string()]);
+
+        let json = prefs.to_provider_json();
+        let provider = json.get("provider").unwrap().as_object().unwrap();
+        assert_eq!(
+            provider.get("quantizations").unwrap(),
+            &serde_json::json!(["fp8", "fp16"])
+        );
+    }
+
+    #[test]
+    fn test_openrouter_preferences_empty_json_has_empty_provider() {
+        let prefs = OpenRouterProviderPreferences::default();
+        let json = prefs.to_provider_json();
+        let provider = json.get("provider").unwrap().as_object().unwrap();
+        assert!(provider.is_empty());
+    }
+
+    #[test]
+    fn test_openrouter_preferences_skips_none_fields_in_serialization() {
+        let settings = OpenRouterSettings {
+            api_key: Some("test-key".to_string()),
+            show_in_selector: true,
+            provider_preferences: None,
+        };
+        let toml_str = toml::to_string_pretty(&settings).unwrap();
+        // provider_preferences is None, so it should not appear in output
+        assert!(!toml_str.contains("provider_preferences"));
+    }
+
+    #[test]
+    fn test_openrouter_preferences_round_trip_toml() {
+        let toml_str = r#"
+            [provider_preferences]
+            order = ["DeepInfra", "DeepSeek"]
+            sort = "throughput"
+            quantizations = ["fp8"]
+            zdr = true
+            allow_fallbacks = false
+            data_collection = "deny"
+            max_price_prompt = 0.30
+            max_price_completion = 0.50
+        "#;
+
+        let settings: OpenRouterSettings = toml::from_str(toml_str).unwrap();
+        let prefs = settings.provider_preferences.unwrap();
+        assert_eq!(
+            prefs.order,
+            Some(vec!["DeepInfra".to_string(), "DeepSeek".to_string()])
+        );
+        assert_eq!(prefs.sort, Some("throughput".to_string()));
+        assert_eq!(
+            prefs.quantizations,
+            Some(vec!["fp8".to_string()])
+        );
+        assert_eq!(prefs.zdr, Some(true));
+        assert_eq!(prefs.allow_fallbacks, Some(false));
+        assert_eq!(prefs.data_collection, Some("deny".to_string()));
+        assert!((prefs.max_price_prompt.unwrap() - 0.30).abs() < f64::EPSILON);
+        assert!((prefs.max_price_completion.unwrap() - 0.50).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_openrouter_preferences_partial_toml() {
+        // Only some fields set - others should be None
+        let toml_str = r#"
+            [provider_preferences]
+            order = ["DeepInfra"]
+        "#;
+
+        let settings: OpenRouterSettings = toml::from_str(toml_str).unwrap();
+        let prefs = settings.provider_preferences.unwrap();
+        assert_eq!(prefs.order, Some(vec!["DeepInfra".to_string()]));
+        assert!(prefs.only.is_none());
+        assert!(prefs.ignore.is_none());
+        assert!(prefs.sort.is_none());
+        assert!(prefs.zdr.is_none());
+        assert!(prefs.quantizations.is_none());
+    }
+
+    #[test]
+    fn test_openrouter_settings_with_preferences_in_full_config() {
+        let toml_str = r#"
+            [ai]
+            default_provider = "openrouter"
+            default_model = "deepseek/deepseek-v3.2"
+
+            [ai.openrouter]
+            api_key = "sk-or-v1-test"
+
+            [ai.openrouter.provider_preferences]
+            order = ["DeepInfra", "DeepSeek"]
+            sort = "throughput"
+            quantizations = ["fp8"]
+        "#;
+
+        let settings: QbitSettings = toml::from_str(toml_str).unwrap();
+        assert_eq!(settings.ai.default_provider, AiProvider::Openrouter);
+        assert_eq!(settings.ai.openrouter.api_key, Some("sk-or-v1-test".to_string()));
+        let prefs = settings.ai.openrouter.provider_preferences.unwrap();
+        assert_eq!(
+            prefs.order,
+            Some(vec!["DeepInfra".to_string(), "DeepSeek".to_string()])
+        );
+        assert_eq!(prefs.sort, Some("throughput".to_string()));
+        assert!(!prefs.is_empty());
+    }
 }
