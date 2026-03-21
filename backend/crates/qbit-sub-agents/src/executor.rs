@@ -12,7 +12,8 @@ use futures::StreamExt;
 use rig::completion::request::ToolDefinition;
 use rig::completion::{AssistantContent, CompletionModel as RigCompletionModel, Message};
 use rig::message::{
-    Reasoning, Text, ToolCall, ToolFunction, ToolResult, ToolResultContent, UserContent,
+    Reasoning, ReasoningContent, Text, ToolCall, ToolFunction, ToolResult, ToolResultContent,
+    UserContent,
 };
 use rig::one_or_many::OneOrMany;
 use rig::streaming::StreamedAssistantContent;
@@ -1477,7 +1478,10 @@ mod tests {
 
         assert_eq!(content.len(), 1);
         if let AssistantContent::Reasoning(reasoning) = &content[0] {
-            assert_eq!(reasoning.signature, Some("signature_xyz".to_string()));
+            assert!(matches!(
+                reasoning.content.first(),
+                Some(ReasoningContent::Text { signature: Some(sig), .. }) if sig == "signature_xyz"
+            ));
         } else {
             panic!("Expected Reasoning content");
         }
@@ -1558,9 +1562,11 @@ mod tests {
 
         // Verify Reasoning content
         if let AssistantContent::Reasoning(reasoning) = &content[0] {
-            assert_eq!(reasoning.reasoning, vec!["My thinking process"]);
+            assert_eq!(reasoning.content, vec![ReasoningContent::Text {
+                text: "My thinking process".to_string(),
+                signature: Some("sig_789".to_string()),
+            }]);
             assert_eq!(reasoning.id, Some("id_456".to_string()));
-            assert_eq!(reasoning.signature, Some("sig_789".to_string()));
         } else {
             panic!("Expected Reasoning content at index 0");
         }
@@ -1678,8 +1684,11 @@ mod tests {
 
         if let AssistantContent::Reasoning(reasoning) = &content[0] {
             assert_eq!(reasoning.id, Some("thinking_id_abc".to_string()));
-            assert_eq!(reasoning.signature, Some("signature_xyz".to_string()));
-            assert!(!reasoning.reasoning.is_empty());
+            assert!(matches!(
+                reasoning.content.first(),
+                Some(ReasoningContent::Text { signature: Some(sig), .. }) if sig == "signature_xyz"
+            ));
+            assert!(!reasoning.content.is_empty());
         } else {
             panic!("Expected Reasoning content");
         }

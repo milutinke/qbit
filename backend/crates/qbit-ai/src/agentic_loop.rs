@@ -471,12 +471,14 @@ mod stream_start_retry_behavior_tests {
                     input_tokens: 10,
                     output_tokens: 5,
                     total_tokens: 15,
+                    cached_input_tokens: 0,
                 },
                 raw_response: MockStreamingResponseData {
                     text,
                     input_tokens: 10,
                     output_tokens: 5,
                 },
+                message_id: None,
             })
         }
 
