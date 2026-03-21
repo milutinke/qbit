@@ -12,8 +12,7 @@ use futures::StreamExt;
 use rig::completion::request::ToolDefinition;
 use rig::completion::{AssistantContent, CompletionModel as RigCompletionModel, Message};
 use rig::message::{
-    Reasoning, ReasoningContent, Text, ToolCall, ToolFunction, ToolResult, ToolResultContent,
-    UserContent,
+    Reasoning, Text, ToolCall, ToolFunction, ToolResult, ToolResultContent, UserContent,
 };
 use rig::one_or_many::OneOrMany;
 use rig::streaming::StreamedAssistantContent;
@@ -1315,6 +1314,7 @@ pub fn build_assistant_content(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rig::message::ReasoningContent;
 
     fn make_tool_call(id: &str, name: &str) -> ToolCall {
         ToolCall {

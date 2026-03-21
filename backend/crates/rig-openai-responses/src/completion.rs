@@ -1309,6 +1309,8 @@ mod build_request_tests {
             max_tokens: None,
             tool_choice: None,
             additional_params: None,
+            model: None,
+            output_schema: None,
         }
     }
 
