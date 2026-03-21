@@ -280,6 +280,8 @@ where
             max_tokens: Some(2048),
             tool_choice: None,
             additional_params: None,
+            model: None,
+            output_schema: None,
         };
 
         match model.completion(generation_request).await {
@@ -419,6 +421,8 @@ where
                 max_tokens: Some(8192),
                 tool_choice: None,
                 additional_params: None,
+                model: None,
+                output_schema: None,
             };
 
             if let Some(stats) = ctx.api_request_stats {
@@ -470,6 +474,8 @@ where
             max_tokens: Some(8192),
             tool_choice: None,
             additional_params: None,
+            model: None,
+            output_schema: None,
         };
 
         // Create LLM completion span for this iteration (Langfuse observability)
@@ -576,14 +582,16 @@ where
                         text_content.push_str(&text_msg.text);
                     }
                     StreamedAssistantContent::Reasoning(reasoning) => {
-                        let reasoning_str = reasoning.reasoning.join("");
-                        if !reasoning_str.is_empty() {
-                            tracing::debug!("[sub-agent] Thinking: {} chars", reasoning_str.len());
-                            thinking_text.push_str(&reasoning_str);
-                        }
-                        // Capture signature and id for history (required by Anthropic API)
-                        if reasoning.signature.is_some() && thinking_signature.is_none() {
-                            thinking_signature = reasoning.signature.clone();
+                        for item in &reasoning.content {
+                            if let rig::message::ReasoningContent::Text { text, signature } = item {
+                                if !text.is_empty() {
+                                    tracing::debug!("[sub-agent] Thinking: {} chars", text.len());
+                                    thinking_text.push_str(text);
+                                }
+                                if signature.is_some() && thinking_signature.is_none() {
+                                    thinking_signature = signature.clone();
+                                }
+                            }
                         }
                         if reasoning.id.is_some() && thinking_id.is_none() {
                             thinking_id = reasoning.id.clone();
@@ -598,7 +606,7 @@ where
                             thinking_id = id;
                         }
                     }
-                    StreamedAssistantContent::ToolCall(tool_call) => {
+                    StreamedAssistantContent::ToolCall { tool_call, .. } => {
                         tracing::debug!(
                             "[sub-agent] Received tool call: {} (id: {})",
                             tool_call.function.name,
@@ -660,7 +668,7 @@ where
                             current_tool_name = Some(tool_call.function.name.clone());
                         }
                     }
-                    StreamedAssistantContent::ToolCallDelta { id, content } => {
+                    StreamedAssistantContent::ToolCallDelta { id, content, .. } => {
                         // If we don't have a current tool ID but the delta has one, use it
                         if current_tool_id.is_none() && !id.is_empty() {
                             current_tool_id = Some(id);
@@ -1283,9 +1291,8 @@ pub fn build_assistant_content(
     let has_reasoning = !thinking_text.is_empty() || thinking_id.is_some();
     if supports_thinking_history && has_reasoning {
         content.push(AssistantContent::Reasoning(
-            Reasoning::multi(vec![thinking_text.to_string()])
-                .optional_id(thinking_id)
-                .with_signature(thinking_signature),
+            Reasoning::new_with_signature(thinking_text, thinking_signature)
+                .optional_id(thinking_id),
         ));
     }
 
