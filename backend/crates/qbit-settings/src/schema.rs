@@ -355,6 +355,201 @@ pub struct OpenRouterSettings {
     /// Whether to show this provider's models in the model selector
     #[serde(default = "default_true")]
     pub show_in_selector: bool,
+
+    /// Provider preferences for routing and filtering (optional).
+    /// See https://openrouter.ai/docs/guides/routing/provider-selection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_preferences: Option<OpenRouterProviderPreferences>,
+}
+
+/// OpenRouter provider preferences for routing, filtering, and prioritization.
+///
+/// Maps to OpenRouter's Provider Routing API:
+/// <https://openrouter.ai/docs/guides/routing/provider-selection>
+///
+/// All fields are optional. Only non-None fields are sent to the API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OpenRouterProviderPreferences {
+    /// Provider priority ordering. Try these providers first, in order.
+    /// Example: ["DeepInfra", "DeepSeek", "Chutes"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<Vec<String>>,
+
+    /// Hard allowlist: only use these providers.
+    /// Example: ["DeepInfra", "AtlasCloud"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub only: Option<Vec<String>>,
+
+    /// Blocklist: never use these providers.
+    /// Example: ["Google Vertex"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore: Option<Vec<String>>,
+
+    /// Whether to allow fallback to other providers when preferred ones are unavailable.
+    /// Defaults to true if not specified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_fallbacks: Option<bool>,
+
+    /// Only route to providers that support all request parameters.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub require_parameters: Option<bool>,
+
+    /// Data collection policy: "allow" or "deny".
+    /// "deny" restricts to providers that do not store user data non-transiently.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_collection: Option<String>,
+
+    /// Require Zero Data Retention endpoints only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zdr: Option<bool>,
+
+    /// Sort providers by: "price", "throughput", or "latency".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+
+    /// Minimum throughput threshold in tokens/sec.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preferred_min_throughput: Option<f64>,
+
+    /// Maximum latency threshold in seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preferred_max_latency: Option<f64>,
+
+    /// Maximum price per prompt token (in USD per million tokens).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_price_prompt: Option<f64>,
+
+    /// Maximum price per completion token (in USD per million tokens).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_price_completion: Option<f64>,
+
+    /// Filter by quantization levels.
+    /// Valid values: "int4", "int8", "fp8", "fp16", "bf16", "fp32", "unknown"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantizations: Option<Vec<String>>,
+}
+
+impl Default for OpenRouterProviderPreferences {
+    fn default() -> Self {
+        Self {
+            order: None,
+            only: None,
+            ignore: None,
+            allow_fallbacks: None,
+            require_parameters: None,
+            data_collection: None,
+            zdr: None,
+            sort: None,
+            preferred_min_throughput: None,
+            preferred_max_latency: None,
+            max_price_prompt: None,
+            max_price_completion: None,
+            quantizations: None,
+        }
+    }
+}
+
+impl OpenRouterProviderPreferences {
+    /// Convert to JSON value suitable for OpenRouter's `provider` field in additional_params.
+    ///
+    /// Produces a JSON object like:
+    /// ```json
+    /// {
+    ///   "provider": {
+    ///     "order": ["DeepInfra", "DeepSeek"],
+    ///     "sort": "throughput",
+    ///     "quantizations": ["fp8"]
+    ///   }
+    /// }
+    /// ```
+    pub fn to_provider_json(&self) -> serde_json::Value {
+        let mut provider = serde_json::Map::new();
+
+        if let Some(ref order) = self.order {
+            provider.insert("order".to_string(), serde_json::json!(order));
+        }
+        if let Some(ref only) = self.only {
+            provider.insert("only".to_string(), serde_json::json!(only));
+        }
+        if let Some(ref ignore) = self.ignore {
+            provider.insert("ignore".to_string(), serde_json::json!(ignore));
+        }
+        if let Some(allow_fallbacks) = self.allow_fallbacks {
+            provider.insert(
+                "allow_fallbacks".to_string(),
+                serde_json::json!(allow_fallbacks),
+            );
+        }
+        if let Some(require_parameters) = self.require_parameters {
+            provider.insert(
+                "require_parameters".to_string(),
+                serde_json::json!(require_parameters),
+            );
+        }
+        if let Some(ref data_collection) = self.data_collection {
+            provider.insert(
+                "data_collection".to_string(),
+                serde_json::json!(data_collection),
+            );
+        }
+        if let Some(zdr) = self.zdr {
+            provider.insert("zdr".to_string(), serde_json::json!(zdr));
+        }
+        if let Some(ref sort) = self.sort {
+            provider.insert("sort".to_string(), serde_json::json!(sort));
+        }
+        if let Some(throughput) = self.preferred_min_throughput {
+            provider.insert(
+                "preferred_min_throughput".to_string(),
+                serde_json::json!(throughput),
+            );
+        }
+        if let Some(latency) = self.preferred_max_latency {
+            provider.insert(
+                "preferred_max_latency".to_string(),
+                serde_json::json!(latency),
+            );
+        }
+
+        // Build max_price sub-object if any price field is set
+        if self.max_price_prompt.is_some() || self.max_price_completion.is_some() {
+            let mut max_price = serde_json::Map::new();
+            if let Some(prompt) = self.max_price_prompt {
+                max_price.insert("prompt".to_string(), serde_json::json!(prompt));
+            }
+            if let Some(completion) = self.max_price_completion {
+                max_price.insert("completion".to_string(), serde_json::json!(completion));
+            }
+            provider.insert(
+                "max_price".to_string(),
+                serde_json::Value::Object(max_price),
+            );
+        }
+
+        if let Some(ref quantizations) = self.quantizations {
+            provider.insert("quantizations".to_string(), serde_json::json!(quantizations));
+        }
+
+        serde_json::json!({ "provider": provider })
+    }
+
+    /// Check if any preferences are set.
+    pub fn is_empty(&self) -> bool {
+        self.order.is_none()
+            && self.only.is_none()
+            && self.ignore.is_none()
+            && self.allow_fallbacks.is_none()
+            && self.require_parameters.is_none()
+            && self.data_collection.is_none()
+            && self.zdr.is_none()
+            && self.sort.is_none()
+            && self.preferred_min_throughput.is_none()
+            && self.preferred_max_latency.is_none()
+            && self.max_price_prompt.is_none()
+            && self.max_price_completion.is_none()
+            && self.quantizations.is_none()
+    }
 }
 
 /// Direct Anthropic API settings.
@@ -1013,6 +1208,7 @@ impl Default for OpenRouterSettings {
         Self {
             api_key: None,
             show_in_selector: true,
+            provider_preferences: None,
         }
     }
 }
