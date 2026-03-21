@@ -5479,6 +5479,7 @@ version = "0.2.43"
 dependencies = [
  "bytes",
  "futures",
+ "nanoid",
  "qbit-json-repair",
  "regex",
  "reqwest 0.12.28",
