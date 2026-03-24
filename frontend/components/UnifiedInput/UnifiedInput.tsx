@@ -1405,7 +1405,7 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
                 }}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
-                disabled={isInputDisabled}
+                disabled={isSessionDead}
                 placeholder={
                   showHistorySearch
                     ? ""
@@ -1421,7 +1421,7 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
                   "bg-transparent border-none shadow-none resize-none",
                   "font-mono text-[13px] text-foreground leading-relaxed",
                   "focus:outline-none focus:ring-0",
-                  "disabled:opacity-50",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
                   "placeholder:text-muted-foreground"
                 )}
                 style={isBlockCaret ? { caretColor: "transparent" } : undefined}
@@ -1437,7 +1437,7 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
                 textareaRef={textareaRef}
                 text={input}
                 settings={caretSettings}
-                visible={isFocused && isBlockCaret && !isInputDisabled}
+                visible={isFocused && isBlockCaret && !isSessionDead}
               />
               {/* Ghost completion hint - shown inline after current input */}
               {ghostText && inputMode === "terminal" && !showHistorySearch && (
