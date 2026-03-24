@@ -678,448 +678,437 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
             </button>
           </div>
         ) : (
-        <div className="flex items-center rounded-lg bg-muted/50 p-0.5 border border-[var(--border-subtle)]/50">
-          <button
-            type="button"
-            aria-label={
-              inputMode === "terminal" ? "Switch to Auto mode" : "Switch to Terminal mode"
-            }
-            title="Terminal"
-            onClick={() => setInputMode(sessionId, inputMode === "terminal" ? "auto" : "terminal")}
-            className={cn(
-              "h-6 w-6 flex items-center justify-center rounded-md transition-all duration-200",
-              inputMode === "terminal"
-                ? "bg-accent/15 text-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            <Terminal className="size-icon-status-bar" />
-          </button>
-          <button
-            type="button"
-            aria-label={inputMode === "agent" ? "Switch to Auto mode" : "Switch to AI mode"}
-            title="AI"
-            onClick={() => setInputMode(sessionId, inputMode === "agent" ? "auto" : "agent")}
-            className={cn(
-              "h-6 w-6 flex items-center justify-center rounded-md transition-all duration-200",
-              inputMode === "agent"
-                ? "bg-accent/15 text-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            <Bot className="size-icon-status-bar" />
-          </button>
-        </div>
+          <div className="flex items-center rounded-lg bg-muted/50 p-0.5 border border-[var(--border-subtle)]/50">
+            <button
+              type="button"
+              aria-label={
+                inputMode === "terminal" ? "Switch to Auto mode" : "Switch to Terminal mode"
+              }
+              title="Terminal"
+              onClick={() =>
+                setInputMode(sessionId, inputMode === "terminal" ? "auto" : "terminal")
+              }
+              className={cn(
+                "h-6 w-6 flex items-center justify-center rounded-md transition-all duration-200",
+                inputMode === "terminal"
+                  ? "bg-accent/15 text-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              <Terminal className="size-icon-status-bar" />
+            </button>
+            <button
+              type="button"
+              aria-label={inputMode === "agent" ? "Switch to Auto mode" : "Switch to AI mode"}
+              title="AI"
+              onClick={() => setInputMode(sessionId, inputMode === "agent" ? "auto" : "agent")}
+              className={cn(
+                "h-6 w-6 flex items-center justify-center rounded-md transition-all duration-200",
+                inputMode === "agent"
+                  ? "bg-accent/15 text-accent shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+            >
+              <Bot className="size-icon-status-bar" />
+            </button>
+          </div>
         )}
 
         {/* Divider + Model selector badge */}
         {display.showStatusBadge && (
-        <div className="ui-fade-width" data-visible={String(!hideAiItems)} style={{ marginLeft: "8px" }}>
-        <div
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-        >
-          <div className="h-4 w-px bg-[var(--border-medium)]" />
-          {status === "disconnected" ? (
-          <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-muted/60 text-muted-foreground flex items-center border border-transparent">
-            <Cpu className="size-icon-status-bar" />
-            <span>AI Disconnected</span>
+          <div className="ui-fade-width ml-2" data-visible={String(!hideAiItems)}>
+            <div className="shrink-0 flex items-center gap-2">
+              <div className="h-4 w-px bg-[var(--border-medium)]" />
+              {status === "disconnected" ? (
+                <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-muted/60 text-muted-foreground flex items-center border border-transparent">
+                  <Cpu className="size-icon-status-bar" />
+                  <span>AI Disconnected</span>
+                </div>
+              ) : status === "error" ? (
+                <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-destructive/10 text-destructive flex items-center border border-destructive/20">
+                  <Cpu className="size-icon-status-bar" />
+                  <span>AI Error</span>
+                </div>
+              ) : status === "initializing" ? (
+                <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent flex items-center border border-accent/20">
+                  <Cpu className="size-icon-status-bar animate-pulse" />
+                  <span>Initializing...</span>
+                </div>
+              ) : !hasVisibleProviders ? (
+                <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-muted/60 text-muted-foreground flex items-center border border-transparent">
+                  <Cpu className="size-icon-status-bar" />
+                  <span>Enable a provider in settings</span>
+                </div>
+              ) : (
+                <DropdownMenu onOpenChange={(open) => open && refreshProviderSettings()}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:text-accent hover:bg-accent/20 border border-accent/20 hover:border-accent/30"
+                    >
+                      <Cpu className="size-icon-status-bar" />
+                      <span>{formatModelName(model, currentReasoningEffort)}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="bg-card border-[var(--border-medium)] min-w-[200px]"
+                  >
+                    {/* Vertex AI Models */}
+                    {showVertexAi && (
+                      <>
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Vertex AI
+                        </div>
+                        {(getProviderGroup("vertex_ai")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "vertex")}
+                            disabled={!aiConfig?.vertexConfig && !vertexAiCredentials}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "anthropic_vertex"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Vertex Gemini Models with nested groups */}
+                    {showVertexGemini && (
+                      <>
+                        {showVertexAi && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Vertex AI Gemini
+                        </div>
+                        {(getProviderGroupNested("vertex_gemini")?.models ?? []).map((entry) =>
+                          renderModelEntry(
+                            entry,
+                            "vertex_gemini",
+                            "vertex_gemini",
+                            provider,
+                            model,
+                            currentReasoningEffort,
+                            false,
+                            vertexGeminiCredentials,
+                            handleModelSelect
+                          )
+                        )}
+                      </>
+                    )}
+
+                    {/* OpenRouter Models */}
+                    {showOpenRouter && (
+                      <>
+                        {(showVertexAi || showVertexGemini) && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          OpenRouter
+                        </div>
+                        {(getProviderGroup("openrouter")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "openrouter")}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "openrouter"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* OpenAI Models with nested reasoning effort */}
+                    {showOpenAi && (
+                      <>
+                        {(showVertexAi || showVertexGemini || showOpenRouter) && (
+                          <DropdownMenuSeparator />
+                        )}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          OpenAI
+                        </div>
+                        {(getProviderGroupNested("openai")?.models ?? []).map((entry) =>
+                          renderModelEntry(
+                            entry,
+                            "openai",
+                            "openai",
+                            provider,
+                            model,
+                            currentReasoningEffort,
+                            true,
+                            null,
+                            handleModelSelect
+                          )
+                        )}
+                      </>
+                    )}
+
+                    {/* Anthropic Models */}
+                    {showAnthropic && (
+                      <>
+                        {(showVertexAi || showVertexGemini || showOpenRouter || showOpenAi) && (
+                          <DropdownMenuSeparator />
+                        )}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Anthropic
+                        </div>
+                        {(getProviderGroup("anthropic")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "anthropic")}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "anthropic"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Ollama */}
+                    {showOllama && (
+                      <>
+                        {(showVertexAi ||
+                          showVertexGemini ||
+                          showOpenRouter ||
+                          showOpenAi ||
+                          showAnthropic) && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Ollama (Local)
+                        </div>
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                          Configure in settings
+                        </div>
+                      </>
+                    )}
+
+                    {/* Gemini Models */}
+                    {showGemini && (
+                      <>
+                        {(showVertexAi ||
+                          showVertexGemini ||
+                          showOpenRouter ||
+                          showOpenAi ||
+                          showAnthropic ||
+                          showOllama) && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Google Gemini
+                        </div>
+                        {(getProviderGroup("gemini")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "gemini")}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "gemini"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Groq Models */}
+                    {showGroq && (
+                      <>
+                        {(showVertexAi ||
+                          showVertexGemini ||
+                          showOpenRouter ||
+                          showOpenAi ||
+                          showAnthropic ||
+                          showOllama ||
+                          showGemini) && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Groq
+                        </div>
+                        {(getProviderGroup("groq")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "groq")}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "groq"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* xAI Models */}
+                    {showXai && (
+                      <>
+                        {(showVertexAi ||
+                          showVertexGemini ||
+                          showOpenRouter ||
+                          showOpenAi ||
+                          showAnthropic ||
+                          showOllama ||
+                          showGemini ||
+                          showGroq) && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          xAI (Grok)
+                        </div>
+                        {(getProviderGroup("xai")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "xai")}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "xai"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+
+                    {/* Z.AI SDK Models */}
+                    {showZaiSdk && (
+                      <>
+                        {(showVertexAi ||
+                          showVertexGemini ||
+                          showOpenRouter ||
+                          showOpenAi ||
+                          showAnthropic ||
+                          showOllama ||
+                          showGemini ||
+                          showGroq ||
+                          showXai) && <DropdownMenuSeparator />}
+                        <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                          Z.AI SDK
+                        </div>
+                        {(getProviderGroup("zai_sdk")?.models ?? []).map((m) => (
+                          <DropdownMenuItem
+                            key={m.id}
+                            onClick={() => handleModelSelect(m.id, "zai_sdk")}
+                            className={cn(
+                              "text-xs cursor-pointer",
+                              model === m.id && provider === "zai_sdk"
+                                ? "text-accent bg-[var(--accent-dim)]"
+                                : "text-foreground hover:text-accent"
+                            )}
+                          >
+                            {m.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
-        ) : status === "error" ? (
-          <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-destructive/10 text-destructive flex items-center border border-destructive/20">
-            <Cpu className="size-icon-status-bar" />
-            <span>AI Error</span>
-          </div>
-        ) : status === "initializing" ? (
-          <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent flex items-center border border-accent/20">
-            <Cpu className="size-icon-status-bar animate-pulse" />
-            <span>Initializing...</span>
-          </div>
-        ) : !hasVisibleProviders ? (
-          <div className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-muted/60 text-muted-foreground flex items-center border border-transparent">
-            <Cpu className="size-icon-status-bar" />
-            <span>Enable a provider in settings</span>
-          </div>
-        ) : (
-          <DropdownMenu onOpenChange={(open) => open && refreshProviderSettings()}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:text-accent hover:bg-accent/20 border border-accent/20 hover:border-accent/30"
-              >
-                <Cpu className="size-icon-status-bar" />
-                <span>{formatModelName(model, currentReasoningEffort)}</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="bg-card border-[var(--border-medium)] min-w-[200px]"
-            >
-              {/* Vertex AI Models */}
-              {showVertexAi && (
-                <>
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Vertex AI
-                  </div>
-                  {(getProviderGroup("vertex_ai")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "vertex")}
-                      disabled={!aiConfig?.vertexConfig && !vertexAiCredentials}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "anthropic_vertex"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* Vertex Gemini Models with nested groups */}
-              {showVertexGemini && (
-                <>
-                  {showVertexAi && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Vertex AI Gemini
-                  </div>
-                  {(getProviderGroupNested("vertex_gemini")?.models ?? []).map((entry) =>
-                    renderModelEntry(
-                      entry,
-                      "vertex_gemini",
-                      "vertex_gemini",
-                      provider,
-                      model,
-                      currentReasoningEffort,
-                      false,
-                      vertexGeminiCredentials,
-                      handleModelSelect
-                    )
-                  )}
-                </>
-              )}
-
-              {/* OpenRouter Models */}
-              {showOpenRouter && (
-                <>
-                  {(showVertexAi || showVertexGemini) && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    OpenRouter
-                  </div>
-                  {(getProviderGroup("openrouter")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "openrouter")}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "openrouter"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* OpenAI Models with nested reasoning effort */}
-              {showOpenAi && (
-                <>
-                  {(showVertexAi || showVertexGemini || showOpenRouter) && (
-                    <DropdownMenuSeparator />
-                  )}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    OpenAI
-                  </div>
-                  {(getProviderGroupNested("openai")?.models ?? []).map((entry) =>
-                    renderModelEntry(
-                      entry,
-                      "openai",
-                      "openai",
-                      provider,
-                      model,
-                      currentReasoningEffort,
-                      true,
-                      null,
-                      handleModelSelect
-                    )
-                  )}
-                </>
-              )}
-
-              {/* Anthropic Models */}
-              {showAnthropic && (
-                <>
-                  {(showVertexAi || showVertexGemini || showOpenRouter || showOpenAi) && (
-                    <DropdownMenuSeparator />
-                  )}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Anthropic
-                  </div>
-                  {(getProviderGroup("anthropic")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "anthropic")}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "anthropic"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* Ollama */}
-              {showOllama && (
-                <>
-                  {(showVertexAi ||
-                    showVertexGemini ||
-                    showOpenRouter ||
-                    showOpenAi ||
-                    showAnthropic) && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Ollama (Local)
-                  </div>
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                    Configure in settings
-                  </div>
-                </>
-              )}
-
-              {/* Gemini Models */}
-              {showGemini && (
-                <>
-                  {(showVertexAi ||
-                    showVertexGemini ||
-                    showOpenRouter ||
-                    showOpenAi ||
-                    showAnthropic ||
-                    showOllama) && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Google Gemini
-                  </div>
-                  {(getProviderGroup("gemini")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "gemini")}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "gemini"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* Groq Models */}
-              {showGroq && (
-                <>
-                  {(showVertexAi ||
-                    showVertexGemini ||
-                    showOpenRouter ||
-                    showOpenAi ||
-                    showAnthropic ||
-                    showOllama ||
-                    showGemini) && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Groq
-                  </div>
-                  {(getProviderGroup("groq")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "groq")}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "groq"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* xAI Models */}
-              {showXai && (
-                <>
-                  {(showVertexAi ||
-                    showVertexGemini ||
-                    showOpenRouter ||
-                    showOpenAi ||
-                    showAnthropic ||
-                    showOllama ||
-                    showGemini ||
-                    showGroq) && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    xAI (Grok)
-                  </div>
-                  {(getProviderGroup("xai")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "xai")}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "xai"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* Z.AI SDK Models */}
-              {showZaiSdk && (
-                <>
-                  {(showVertexAi ||
-                    showVertexGemini ||
-                    showOpenRouter ||
-                    showOpenAi ||
-                    showAnthropic ||
-                    showOllama ||
-                    showGemini ||
-                    showGroq ||
-                    showXai) && <DropdownMenuSeparator />}
-                  <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Z.AI SDK
-                  </div>
-                  {(getProviderGroup("zai_sdk")?.models ?? []).map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      onClick={() => handleModelSelect(m.id, "zai_sdk")}
-                      className={cn(
-                        "text-xs cursor-pointer",
-                        model === m.id && provider === "zai_sdk"
-                          ? "text-accent bg-[var(--accent-dim)]"
-                          : "text-foreground hover:text-accent"
-                      )}
-                    >
-                      {m.name}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          )}
-        </div>
-        </div>
         )}
 
         {/* Agent Mode Selector */}
         {display.showAgentModeSelector && (
-        <div className="ui-fade-width" data-visible={String(!hideAiItems)} style={{ marginLeft: "8px" }}>
-        <div
-          style={{
-            flexShrink: 0,
-          }}
-        >
-          {status === "ready" && <AgentModeSelector sessionId={sessionId} showLabel={showLabels} />}
-        </div>
-        </div>
+          <div className="ui-fade-width ml-2" data-visible={String(!hideAiItems)}>
+            <div className="shrink-0">
+              {status === "ready" && (
+                <AgentModeSelector sessionId={sessionId} showLabel={showLabels} />
+              )}
+            </div>
+          </div>
         )}
 
         {/* Context utilization indicator */}
         {display.showContextUsage && (
-        <div className="ui-fade-width" data-visible={String(!hideAiItems)} style={{ marginLeft: "8px" }}>
-        <div
-          style={{
-            flexShrink: 0,
-          }}
-        >
-          {contextMetrics.maxTokens > 0 ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                title={`Context: ${Math.round(contextMetrics.utilization * 100)}% used`}
-                className={cn(
-                  "h-6 px-2 gap-1.5 text-xs font-medium rounded-lg flex items-center cursor-pointer transition-all duration-200",
-                  contextMetrics.utilization < 0.7 &&
-                    "bg-[#9ece6a]/10 text-[#9ece6a] hover:bg-[#9ece6a]/20 border border-[#9ece6a]/20 hover:border-[#9ece6a]/30",
-                  contextMetrics.utilization >= 0.7 &&
-                    contextMetrics.utilization < 0.85 &&
-                    "bg-[#e0af68]/10 text-[#e0af68] hover:bg-[#e0af68]/20 border border-[#e0af68]/20 hover:border-[#e0af68]/30",
-                  contextMetrics.utilization >= 0.85 &&
-                    "bg-[#f7768e]/10 text-[#f7768e] hover:bg-[#f7768e]/20 border border-[#f7768e]/20 hover:border-[#f7768e]/30"
-                )}
-              >
-                <Gauge className="size-icon-status-bar" />
-                <span>{Math.round(contextMetrics.utilization * 100)}%</span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="w-auto min-w-[200px] p-3 bg-card/95 backdrop-blur-sm border-[var(--border-medium)] shadow-lg"
-            >
-              <div className="text-xs font-medium text-muted-foreground mb-2">
-                Context Window Usage
-              </div>
-              <div className="font-mono text-xs space-y-1">
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Used</span>
-                  <span className="text-foreground">
-                    {formatTokenCountDetailed(contextMetrics.usedTokens)}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Max</span>
-                  <span className="text-foreground">
-                    {formatTokenCountDetailed(contextMetrics.maxTokens)}
-                  </span>
-                </div>
-                <div className="border-t border-[var(--border-subtle)] my-1.5" />
-                <div className="flex justify-between gap-4">
-                  <span className="text-muted-foreground">Utilization</span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      contextMetrics.utilization < 0.7 && "text-[#9ece6a]",
-                      contextMetrics.utilization >= 0.7 &&
-                        contextMetrics.utilization < 0.85 &&
-                        "text-[#e0af68]",
-                      contextMetrics.utilization >= 0.85 && "text-[#f7768e]"
-                    )}
+          <div className="ui-fade-width ml-2" data-visible={String(!hideAiItems)}>
+            <div className="shrink-0">
+              {contextMetrics.maxTokens > 0 ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      title={`Context: ${Math.round(contextMetrics.utilization * 100)}% used`}
+                      className={cn(
+                        "h-6 px-2 gap-1.5 text-xs font-medium rounded-lg flex items-center cursor-pointer transition-all duration-200",
+                        contextMetrics.utilization < 0.7 &&
+                          "bg-[#9ece6a]/10 text-[#9ece6a] hover:bg-[#9ece6a]/20 border border-[#9ece6a]/20 hover:border-[#9ece6a]/30",
+                        contextMetrics.utilization >= 0.7 &&
+                          contextMetrics.utilization < 0.85 &&
+                          "bg-[#e0af68]/10 text-[#e0af68] hover:bg-[#e0af68]/20 border border-[#e0af68]/20 hover:border-[#e0af68]/30",
+                        contextMetrics.utilization >= 0.85 &&
+                          "bg-[#f7768e]/10 text-[#f7768e] hover:bg-[#f7768e]/20 border border-[#f7768e]/20 hover:border-[#f7768e]/30"
+                      )}
+                    >
+                      <Gauge className="size-icon-status-bar" />
+                      <span>{Math.round(contextMetrics.utilization * 100)}%</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="w-auto min-w-[200px] p-3 bg-card/95 backdrop-blur-sm border-[var(--border-medium)] shadow-lg"
                   >
-                    {Math.round(contextMetrics.utilization * 100)}%
-                  </span>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        ) : (
-          <button
-            type="button"
-            title="Context: not available"
-            className="h-6 px-2 gap-1.5 text-xs font-medium rounded-lg flex items-center text-muted-foreground/70 border border-[var(--border-subtle)]/60 bg-card/30"
-          >
-            <Gauge className="size-icon-status-bar" />
-            <span>0%</span>
-          </button>
-          )}
-        </div>
-        </div>
+                    <div className="text-xs font-medium text-muted-foreground mb-2">
+                      Context Window Usage
+                    </div>
+                    <div className="font-mono text-xs space-y-1">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Used</span>
+                        <span className="text-foreground">
+                          {formatTokenCountDetailed(contextMetrics.usedTokens)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Max</span>
+                        <span className="text-foreground">
+                          {formatTokenCountDetailed(contextMetrics.maxTokens)}
+                        </span>
+                      </div>
+                      <div className="border-t border-[var(--border-subtle)] my-1.5" />
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Utilization</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            contextMetrics.utilization < 0.7 && "text-[#9ece6a]",
+                            contextMetrics.utilization >= 0.7 &&
+                              contextMetrics.utilization < 0.85 &&
+                              "text-[#e0af68]",
+                            contextMetrics.utilization >= 0.85 && "text-[#f7768e]"
+                          )}
+                        >
+                          {Math.round(contextMetrics.utilization * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <button
+                  type="button"
+                  title="Context: not available"
+                  className="h-6 px-2 gap-1.5 text-xs font-medium rounded-lg flex items-center text-muted-foreground/70 border border-[var(--border-subtle)]/60 bg-card/30"
+                >
+                  <Gauge className="size-icon-status-bar" />
+                  <span>0%</span>
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Langfuse tracing indicator with stats */}
@@ -1174,82 +1163,82 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
 
         {/* MCP servers indicator */}
         {display.showMcpBadge && hasMcpServers && (
-        <div className="ui-fade-width" data-visible={String(!hideAiItems)} style={{ marginLeft: "8px" }}>
-        <div style={{ flexShrink: 0 }}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                title="MCP Servers"
-                className={cn(
-                  "h-6 px-2 gap-1.5 text-xs font-medium rounded-lg flex items-center transition-all duration-200 cursor-pointer",
-                  connectedMcpServers.length > 0
-                    ? "bg-[#22d3ee]/10 text-[#22d3ee] hover:bg-[#22d3ee]/20 border border-[#22d3ee]/20 hover:border-[#22d3ee]/30"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted/70 border border-[var(--border-subtle)]"
-                )}
-              >
-                <Server className="size-icon-status-bar" />
-                <span className="tabular-nums">
-                  {connectedMcpServers.length}/{mcpServers.length}
-                </span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="w-auto min-w-[240px] p-3 bg-card/95 backdrop-blur-sm border-[var(--border-medium)] shadow-lg"
-            >
-              <div className="text-xs font-medium text-muted-foreground mb-2">MCP Servers</div>
-              <div className="space-y-2">
-                {mcpServers.map((server) => {
-                  const serverTools = mcpTools.filter((t) => t.serverName === server.name);
-                  return (
-                    <div key={server.name} className="text-xs">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-foreground truncate max-w-[140px]">
-                          {server.name}
-                        </span>
-                        <span
-                          className={cn(
-                            "text-[10px] px-1.5 py-0.5 rounded",
-                            server.status === "connected" && "bg-green-500/10 text-green-500",
-                            server.status === "connecting" && "bg-blue-500/10 text-blue-500",
-                            server.status === "error" && "bg-red-500/10 text-red-500",
-                            server.status === "disconnected" && "bg-muted text-muted-foreground"
+          <div className="ui-fade-width ml-2" data-visible={String(!hideAiItems)}>
+            <div className="shrink-0">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    title="MCP Servers"
+                    className={cn(
+                      "h-6 px-2 gap-1.5 text-xs font-medium rounded-lg flex items-center transition-all duration-200 cursor-pointer",
+                      connectedMcpServers.length > 0
+                        ? "bg-[#22d3ee]/10 text-[#22d3ee] hover:bg-[#22d3ee]/20 border border-[#22d3ee]/20 hover:border-[#22d3ee]/30"
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted/70 border border-[var(--border-subtle)]"
+                    )}
+                  >
+                    <Server className="size-icon-status-bar" />
+                    <span className="tabular-nums">
+                      {connectedMcpServers.length}/{mcpServers.length}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-auto min-w-[240px] p-3 bg-card/95 backdrop-blur-sm border-[var(--border-medium)] shadow-lg"
+                >
+                  <div className="text-xs font-medium text-muted-foreground mb-2">MCP Servers</div>
+                  <div className="space-y-2">
+                    {mcpServers.map((server) => {
+                      const serverTools = mcpTools.filter((t) => t.serverName === server.name);
+                      return (
+                        <div key={server.name} className="text-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-foreground truncate max-w-[140px]">
+                              {server.name}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded",
+                                server.status === "connected" && "bg-green-500/10 text-green-500",
+                                server.status === "connecting" && "bg-blue-500/10 text-blue-500",
+                                server.status === "error" && "bg-red-500/10 text-red-500",
+                                server.status === "disconnected" && "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {server.status}
+                            </span>
+                          </div>
+                          {server.status === "connected" && serverTools.length > 0 && (
+                            <div className="text-muted-foreground mt-0.5 pl-2">
+                              {serverTools.length} tool{serverTools.length !== 1 ? "s" : ""}
+                            </div>
                           )}
-                        >
-                          {server.status}
-                        </span>
-                      </div>
-                      {server.status === "connected" && serverTools.length > 0 && (
-                        <div className="text-muted-foreground mt-0.5 pl-2">
-                          {serverTools.length} tool{serverTools.length !== 1 ? "s" : ""}
+                          {server.status === "error" && server.error && (
+                            <div
+                              className="text-red-400 mt-0.5 pl-2 truncate max-w-[200px]"
+                              title={server.error}
+                            >
+                              {server.error}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {server.status === "error" && server.error && (
-                        <div
-                          className="text-red-400 mt-0.5 pl-2 truncate max-w-[200px]"
-                          title={server.error}
-                        >
-                          {server.error}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {mcpTools.length > 0 && (
-                <>
-                  <div className="border-t border-[var(--border-subtle)] my-2" />
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Total Tools</span>
-                    <span className="text-foreground tabular-nums">{mcpTools.length}</span>
+                      );
+                    })}
                   </div>
-                </>
-              )}
-            </PopoverContent>
-          </Popover>
-        </div>
-        </div>
+                  {mcpTools.length > 0 && (
+                    <>
+                      <div className="border-t border-[var(--border-subtle)] my-2" />
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Total Tools</span>
+                        <span className="text-foreground tabular-nums">{mcpTools.length}</span>
+                      </div>
+                    </>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
         )}
 
         {import.meta.env.DEV && !isMockBrowserMode() && (

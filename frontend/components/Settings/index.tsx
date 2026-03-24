@@ -253,7 +253,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           />
         );
       case "appearance":
-        return <AppearanceSettings />;
+        return (
+          <AppearanceSettings
+            terminalSettings={settings.terminal}
+            onTerminalChange={(terminal) => updateSection("terminal", terminal)}
+          />
+        );
       case "advanced":
         return (
           <AdvancedSettings

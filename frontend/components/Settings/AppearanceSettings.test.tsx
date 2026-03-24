@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CARET_SETTINGS,
-  type CaretSettings,
   type TerminalSettings as TerminalSettingsType,
 } from "@/lib/settings";
 import { useStore } from "@/store";

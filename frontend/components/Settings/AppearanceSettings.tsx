@@ -16,13 +16,13 @@ import {
   DEFAULT_CARET_SETTINGS,
   type TerminalSettings as TerminalSettingsType,
 } from "@/lib/settings";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import {
-  defaultDisplaySettings,
   type DisplaySettings,
+  defaultDisplaySettings,
   selectDisplaySettings,
 } from "@/store/slices";
-import { cn } from "@/lib/utils";
 import { CaretPreview } from "./CaretPreview";
 import { ThemePicker } from "./ThemePicker";
 
@@ -38,7 +38,12 @@ interface ToggleRowProps {
 
 function ToggleRow({ id, label, description, checked, onCheckedChange, dimmed }: ToggleRowProps) {
   return (
-    <div className={cn("flex items-center justify-between", dimmed && "opacity-40 pointer-events-none")}>
+    <div
+      className={cn(
+        "flex items-center justify-between",
+        dimmed && "opacity-40 pointer-events-none"
+      )}
+    >
       <div className="space-y-1">
         <label htmlFor={id} className="text-sm font-medium text-foreground cursor-pointer">
           {label}
@@ -55,7 +60,10 @@ interface AppearanceSettingsProps {
   onTerminalChange?: (settings: TerminalSettingsType) => void;
 }
 
-export function AppearanceSettings({ terminalSettings, onTerminalChange }: AppearanceSettingsProps) {
+export function AppearanceSettings({
+  terminalSettings,
+  onTerminalChange,
+}: AppearanceSettingsProps) {
   const displaySettings = useStore(selectDisplaySettings);
   const setDisplaySettings = useStore((state) => state.setDisplaySettings);
 
@@ -84,9 +92,25 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
     setDisplaySettings({ ...displaySettings, ...patch });
   };
 
-  const { hideAiSettingsInShellMode: _behavior, ...visibilitySettings } = displaySettings;
-  const allShown = Object.values(visibilitySettings).every(Boolean);
-  const allHidden = Object.values(visibilitySettings).every((v) => !v);
+  const visibilityKeys: Array<keyof DisplaySettings> = [
+    "showTabBar",
+    "showHomeTab",
+    "showFileEditorButton",
+    "showHistoryButton",
+    "showSettingsButton",
+    "showNotificationBell",
+    "showTerminalContext",
+    "showWorkingDirectory",
+    "showGitBranch",
+    "showStatusBar",
+    "showInputModeToggle",
+    "showStatusBadge",
+    "showAgentModeSelector",
+    "showContextUsage",
+    "showMcpBadge",
+  ];
+  const allShown = visibilityKeys.every((k) => displaySettings[k]);
+  const allHidden = visibilityKeys.every((k) => !displaySettings[k]);
 
   const tabBarSubOptions: Array<keyof DisplaySettings> = [
     "showHomeTab",
@@ -109,9 +133,12 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
     "showMcpBadge",
   ];
 
-  const tabBarParentOn = displaySettings.showTabBar || tabBarSubOptions.some((k) => displaySettings[k]);
-  const contextBarParentOn = displaySettings.showTerminalContext || contextBarSubOptions.some((k) => displaySettings[k]);
-  const statusBarParentOn = displaySettings.showStatusBar || statusBarSubOptions.some((k) => displaySettings[k]);
+  const tabBarParentOn =
+    displaySettings.showTabBar || tabBarSubOptions.some((k) => displaySettings[k]);
+  const contextBarParentOn =
+    displaySettings.showTerminalContext || contextBarSubOptions.some((k) => displaySettings[k]);
+  const statusBarParentOn =
+    displaySettings.showStatusBar || statusBarSubOptions.some((k) => displaySettings[k]);
 
   return (
     <div className="space-y-8">
@@ -276,7 +303,9 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
       {/* Section header */}
       <div className="space-y-1">
         <h2 className="text-base font-semibold text-foreground">UI Customization</h2>
-        <p className="text-sm text-muted-foreground">Fine-grained customization of UI elements and components</p>
+        <p className="text-sm text-muted-foreground">
+          Fine-grained customization of UI elements and components
+        </p>
       </div>
 
       {/* General */}
@@ -312,7 +341,12 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
             }
           }}
         />
-        <div className={cn("space-y-4 pl-4 border-l-2 border-[var(--border-subtle)]", !tabBarParentOn && "opacity-40 pointer-events-none")}>
+        <div
+          className={cn(
+            "space-y-4 pl-4 border-l-2 border-[var(--border-subtle)]",
+            !tabBarParentOn && "opacity-40 pointer-events-none"
+          )}
+        >
           <ToggleRow
             id="show-home-tab"
             label="Home Tab"
@@ -372,7 +406,12 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
             }
           }}
         />
-        <div className={cn("space-y-4 pl-4 border-l-2 border-[var(--border-subtle)]", !contextBarParentOn && "opacity-40 pointer-events-none")}>
+        <div
+          className={cn(
+            "space-y-4 pl-4 border-l-2 border-[var(--border-subtle)]",
+            !contextBarParentOn && "opacity-40 pointer-events-none"
+          )}
+        >
           <ToggleRow
             id="show-working-directory"
             label="Working Directory"
@@ -411,7 +450,12 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
             }
           }}
         />
-        <div className={cn("space-y-4 pl-4 border-l-2 border-[var(--border-subtle)]", !statusBarParentOn && "opacity-40 pointer-events-none")}>
+        <div
+          className={cn(
+            "space-y-4 pl-4 border-l-2 border-[var(--border-subtle)]",
+            !statusBarParentOn && "opacity-40 pointer-events-none"
+          )}
+        >
           <ToggleRow
             id="show-input-mode-toggle"
             label="Input Mode Toggle"
@@ -451,9 +495,7 @@ export function AppearanceSettings({ terminalSettings, onTerminalChange }: Appea
       </div>
       {/* Quick actions */}
       <div className="flex items-center gap-3">
-        <p className="text-xs text-muted-foreground">
-          Choose which UI elements are visible.
-        </p>
+        <p className="text-xs text-muted-foreground">Choose which UI elements are visible.</p>
         <span className="text-xs text-muted-foreground/50">·</span>
         <button
           type="button"

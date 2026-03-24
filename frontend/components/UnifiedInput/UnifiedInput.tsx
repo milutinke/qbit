@@ -1,5 +1,5 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { ArrowDown, ArrowUp, Folder, GitBranch, Package, SendHorizontal } from "lucide-react";
+import { SendHorizontal } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FileCommandPopup } from "@/components/FileCommandPopup";
@@ -36,6 +36,7 @@ import { useAgentMessages, useSessionAiConfig, useStore } from "@/store";
 import { useUnifiedInputState } from "@/store/selectors/unified-input";
 import { selectDisplaySettings } from "@/store/slices";
 import { BlockCaret } from "./BlockCaret";
+import { ContextBar } from "./ContextBar";
 import { ImageAttachment, readFileAsBase64 } from "./ImageAttachment";
 import { InputStatusRow } from "./InputStatusRow";
 
@@ -109,7 +110,6 @@ const GhostTextHint = memo(function GhostTextHint({
 
 export function UnifiedInput({ sessionId }: UnifiedInputProps) {
   const workingDirectory = useStore((state) => state.sessions[sessionId]?.workingDirectory);
-  const openGitPanel = useStore((state) => state.openGitPanel);
   const display = useStore(selectDisplaySettings);
   const [input, setInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -138,17 +138,18 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
   const dropZoneRectRef = useRef<DOMRect | null>(null);
 
   // Combined selector for optimized state access (reduces ~12 subscriptions to 1)
-  const {
-    inputMode,
-    virtualEnv,
-    isAgentResponding,
-    isCompacting,
-    isSessionDead,
-    streamingBlocksLength,
-    gitBranch,
-    gitStatus,
-  } = useUnifiedInputState(sessionId);
+  const { inputMode, isAgentResponding, isCompacting, isSessionDead, streamingBlocksLength } =
+    useUnifiedInputState(sessionId);
   const hideAiItems = display.hideAiSettingsInShellMode && inputMode === "terminal";
+
+  const showStatusRow =
+    display.showStatusBar ||
+    display.showInputModeToggle ||
+    (!hideAiItems &&
+      (display.showStatusBadge ||
+        display.showAgentModeSelector ||
+        display.showContextUsage ||
+        display.showMcpBadge));
 
   // AI config for tracking provider changes (used to refresh vision capabilities)
   const aiConfig = useSessionAiConfig(sessionId);
@@ -1227,20 +1228,6 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
     ]
   );
 
-  // Abbreviate path like fish shell: ~/C/p/my-project
-  const displayPath = (() => {
-    if (!workingDirectory) return "~";
-    // Replace home directory with ~
-    const withTilde = workingDirectory.replace(/^\/Users\/[^/]+/, "~");
-    const parts = withTilde.split("/");
-    if (parts.length <= 2) return withTilde; // e.g., "~" or "~/foo"
-    // Keep first (~ or root) and last part full, abbreviate middle parts to first char
-    const first = parts[0];
-    const last = parts[parts.length - 1];
-    const middle = parts.slice(1, -1).map((p) => p[0] || p);
-    return [first, ...middle, last].join("/");
-  })();
-
   // Render pane-level drop zone overlay using portal
   const paneDropOverlay =
     isDragOver && paneContainerRef.current
@@ -1269,80 +1256,7 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
         <InlineTaskPlan sessionId={sessionId} />
 
         {/* Path and badges row - shows shimmer when agent is busy */}
-        {display.showTerminalContext && (display.showWorkingDirectory || display.showGitBranch) && (
-        <div
-          className={cn(
-            "flex items-center gap-2 px-4 py-1.5",
-            isAgentBusy && "agent-loading-shimmer"
-          )}
-        >
-          {/* Path badge (left) */}
-          {display.showWorkingDirectory && (
-          <div
-            className="h-5 px-1.5 gap-1 text-xs rounded bg-muted/50 border border-border/50 inline-flex items-center"
-            title={workingDirectory || "~"}
-          >
-            <Folder className="w-3 h-3 text-[#e0af68] shrink-0" />
-            <span className="text-muted-foreground">{displayPath}</span>
-          </div>
-          )}
-
-          {/* Git badge */}
-          {display.showGitBranch && gitBranch && (
-            <button
-              type="button"
-              onClick={openGitPanel}
-              className="h-5 px-1.5 gap-1 text-xs rounded flex items-center border transition-colors shrink-0 bg-muted/50 hover:bg-muted border-border/50 cursor-pointer"
-              title="Toggle Git Panel"
-            >
-              <GitBranch className="w-3 h-3 text-[#7dcfff]" />
-              {gitBranch && (
-                <>
-                  <span className="text-muted-foreground">{gitBranch}</span>
-                  {gitStatus && (
-                    <>
-                      <span className="text-muted-foreground ml-0.5">|</span>
-                      <span className="text-[#9ece6a]">+{gitStatus.insertions ?? 0}</span>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="text-[#f7768e]">-{gitStatus.deletions ?? 0}</span>
-                      {((gitStatus.ahead ?? 0) > 0 || (gitStatus.behind ?? 0) > 0) && (
-                        <>
-                          <span className="text-muted-foreground ml-0.5">|</span>
-                          {(gitStatus.ahead ?? 0) > 0 && (
-                            <span
-                              className="flex items-center text-[#9ece6a]"
-                              title={`${gitStatus.ahead} to push`}
-                            >
-                              <ArrowUp className="w-2.5 h-2.5" />
-                              {gitStatus.ahead}
-                            </span>
-                          )}
-                          {(gitStatus.behind ?? 0) > 0 && (
-                            <span
-                              className="flex items-center text-[#e0af68]"
-                              title={`${gitStatus.behind} to pull`}
-                            >
-                              <ArrowDown className="w-2.5 h-2.5" />
-                              {gitStatus.behind}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-            </button>
-          )}
-
-          {virtualEnv && (
-            <div className="h-5 px-1.5 gap-1 text-xs rounded bg-[#9ece6a]/10 text-[#9ece6a] flex items-center border border-[#9ece6a]/20 shrink-0">
-              <Package className="w-3 h-3" />
-              <span>{virtualEnv}</span>
-            </div>
-          )}
-        </div>
-        )}
+        <ContextBar sessionId={sessionId} isAgentBusy={isAgentBusy} />
 
         {/* Input row with container */}
         <div className="px-3 py-1 border-y border-[var(--border-subtle)]">
@@ -1516,9 +1430,7 @@ export function UnifiedInput({ sessionId }: UnifiedInputProps) {
         </div>
 
         {/* Status row - model selector, token usage */}
-        {(display.showStatusBar || display.showInputModeToggle || (!hideAiItems && (display.showStatusBadge || display.showAgentModeSelector || display.showContextUsage || display.showMcpBadge))) && (
-          <InputStatusRow sessionId={sessionId} />
-        )}
+        {showStatusRow && <InputStatusRow sessionId={sessionId} />}
       </div>
     </>
   );

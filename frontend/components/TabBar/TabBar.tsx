@@ -51,8 +51,8 @@ import { liveTerminalManager, TerminalInstanceManager } from "@/lib/terminal";
 import { cn } from "@/lib/utils";
 import { isMockBrowserMode } from "@/mocks";
 import { useInputMode, useStore } from "@/store";
-import { selectDisplaySettings } from "@/store/slices";
 import { type TabItemState, useTabBarState } from "@/store/selectors/tab-bar";
+import { selectDisplaySettings } from "@/store/slices";
 
 const startDrag = async (e: React.MouseEvent) => {
   e.preventDefault();
@@ -230,29 +230,26 @@ export const TabBar = React.memo(function TabBar() {
               if (isHomeTab && !homeVisible) return null;
 
               return (
-                <div
+                <TabItem
                   key={tab.id}
-                >
-                  <TabItem
-                    tab={tab}
-                    isActive={isActive}
-                    isBusy={isBusy}
-                    onClose={(e) => handleCloseTab(e, tab.id, tab.tabType)}
-                    onDuplicateTab={createTerminalTab}
-                    canClose={tab.tabType !== "home"}
-                    canMoveLeft={index > 1}
-                    canMoveRight={tab.tabType !== "home" && index < tabs.length - 1}
-                    onMoveLeft={() => moveTab(tab.id, "left")}
-                    onMoveRight={() => moveTab(tab.id, "right")}
-                    onConvertToPane={() => {
-                      logger.info("[TabBar] convert-to-pane: open", { sourceTabId: tab.id });
-                      setConvertToPaneTab(tab.id);
-                    }}
-                    tabNumber={tabNumberById.get(tab.id)}
-                    showTabNumber={cmdKeyPressed}
-                    hasNewActivity={hasNewActivity}
-                  />
-                </div>
+                  tab={tab}
+                  isActive={isActive}
+                  isBusy={isBusy}
+                  onClose={(e) => handleCloseTab(e, tab.id, tab.tabType)}
+                  onDuplicateTab={createTerminalTab}
+                  canClose={tab.tabType !== "home"}
+                  canMoveLeft={index > 1}
+                  canMoveRight={tab.tabType !== "home" && index < tabs.length - 1}
+                  onMoveLeft={() => moveTab(tab.id, "left")}
+                  onMoveRight={() => moveTab(tab.id, "right")}
+                  onConvertToPane={() => {
+                    logger.info("[TabBar] convert-to-pane: open", { sourceTabId: tab.id });
+                    setConvertToPaneTab(tab.id);
+                  }}
+                  tabNumber={tabNumberById.get(tab.id)}
+                  showTabNumber={cmdKeyPressed}
+                  hasNewActivity={hasNewActivity}
+                />
               );
             })}
           </TabsList>
@@ -285,73 +282,80 @@ export const TabBar = React.memo(function TabBar() {
         {isMockBrowserMode() && <MockDevToolsToggle />}
 
         {/* File Editor panel toggle */}
-        {display.showFileEditorButton && <div className="shrink-0 flex items-center justify-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => useStore.getState().toggleFileEditorPanel()}
-                onMouseDown={(e) => e.stopPropagation()}
-                className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
-              >
-                <FileCode className="size-icon-tab-bar" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>File Editor (⇧⌘E)</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>}
+        {display.showFileEditorButton && (
+          <div className="shrink-0 flex items-center justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => useStore.getState().toggleFileEditorPanel()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+                >
+                  <FileCode className="size-icon-tab-bar" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>File Editor (⇧⌘E)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
         {/* History button */}
         {display.showHistoryButton && (
-        <div className="ui-fade-width" data-visible={String(!hideAiItems)}>
-        <div className="shrink-0 flex items-center justify-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => useStore.getState().openSessionBrowser()}
-                onMouseDown={(e) => e.stopPropagation()}
-                className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
-              >
-                <History className="size-icon-tab-bar" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>Session History</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-        </div>)}
+          <div className="ui-fade-width" data-visible={String(!hideAiItems)}>
+            <div className="shrink-0 flex items-center justify-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => useStore.getState().openSessionBrowser()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+                  >
+                    <History className="size-icon-tab-bar" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Session History</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        )}
 
         {/* Settings button */}
-        {display.showSettingsButton && <div className="shrink-0 flex items-center justify-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => useStore.getState().openSettingsTab()}
-                onMouseDown={(e) => e.stopPropagation()}
-                className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
-              >
-                <Settings className="size-icon-tab-bar" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>Settings (⌘,)</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>}
+        {display.showSettingsButton && (
+          <div className="shrink-0 flex items-center justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => useStore.getState().openSettingsTab()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+                >
+                  <Settings className="size-icon-tab-bar" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Settings (⌘,)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
         {/* Separator + Notification widget */}
         {display.showNotificationBell && (
           <div className="shrink-0 flex items-center">
             {/* Separator - only shown when there are buttons to the left */}
-            {(display.showFileEditorButton || (display.showHistoryButton && !hideAiItems) || display.showSettingsButton) && (
+            {(display.showFileEditorButton ||
+              (display.showHistoryButton && !hideAiItems) ||
+              display.showSettingsButton) && (
               <div className="shrink-0 flex items-center justify-center w-[9px]">
                 <div className="h-4 w-px bg-border" />
               </div>
