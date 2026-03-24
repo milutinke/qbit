@@ -1,4 +1,21 @@
+import { useCallback, useState } from "react";
+import { HexColorPicker } from "react-colorful";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import {
+  type CaretSettings,
+  DEFAULT_CARET_SETTINGS,
+  type TerminalSettings as TerminalSettingsType,
+} from "@/lib/settings";
 import { useStore } from "@/store";
 import {
   defaultDisplaySettings,
@@ -6,6 +23,8 @@ import {
   selectDisplaySettings,
 } from "@/store/slices";
 import { cn } from "@/lib/utils";
+import { CaretPreview } from "./CaretPreview";
+import { ThemePicker } from "./ThemePicker";
 
 interface ToggleRowProps {
   id: string;
@@ -31,9 +50,35 @@ function ToggleRow({ id, label, description, checked, onCheckedChange, dimmed }:
   );
 }
 
-export function AppearanceSettings() {
+interface AppearanceSettingsProps {
+  terminalSettings?: TerminalSettingsType;
+  onTerminalChange?: (settings: TerminalSettingsType) => void;
+}
+
+export function AppearanceSettings({ terminalSettings, onTerminalChange }: AppearanceSettingsProps) {
   const displaySettings = useStore(selectDisplaySettings);
   const setDisplaySettings = useStore((state) => state.setDisplaySettings);
+
+  // Caret settings (from terminal settings in settings.toml)
+  const caret: CaretSettings = terminalSettings?.caret ?? DEFAULT_CARET_SETTINGS;
+
+  const updateTerminalField = useCallback(
+    <K extends keyof TerminalSettingsType>(key: K, value: TerminalSettingsType[K]) => {
+      if (terminalSettings && onTerminalChange) {
+        onTerminalChange({ ...terminalSettings, [key]: value });
+      }
+    },
+    [terminalSettings, onTerminalChange]
+  );
+
+  const updateCaret = useCallback(
+    <K extends keyof CaretSettings>(key: K, value: CaretSettings[K]) => {
+      updateTerminalField("caret", { ...caret, [key]: value });
+    },
+    [caret, updateTerminalField]
+  );
+
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const update = (patch: Partial<DisplaySettings>) => {
     setDisplaySettings({ ...displaySettings, ...patch });
@@ -70,6 +115,164 @@ export function AppearanceSettings() {
 
   return (
     <div className="space-y-8">
+      {/* Theme */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-foreground mb-4">Theme</h3>
+        <ThemePicker />
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--border-medium)]" />
+
+      {/* Input Caret */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-foreground">Input Caret</h3>
+
+        {/* Preview */}
+        <CaretPreview settings={caret} />
+
+        {/* Style selector */}
+        <div className="space-y-2">
+          <span className="text-sm font-medium text-foreground">Style</span>
+          <Select
+            value={caret.style}
+            onValueChange={(value: "block" | "default") => updateCaret("style", value)}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="block">Block</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Default uses the native browser text caret. Block renders a customizable overlay.
+          </p>
+        </div>
+
+        {/* Block-specific settings */}
+        {caret.style === "block" && (
+          <div className="space-y-4 pl-2 border-l-2 border-[var(--border-subtle)]">
+            {/* Width */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Width</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {caret.width.toFixed(1)}ch
+                </span>
+              </div>
+              <Slider
+                value={[caret.width]}
+                onValueChange={([v]: number[]) => updateCaret("width", Math.round(v * 10) / 10)}
+                min={0.1}
+                max={3.0}
+                step={0.1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Caret width in character units (0.1–3.0)
+              </p>
+            </div>
+
+            {/* Color */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Color</span>
+                {caret.color && (
+                  <button
+                    type="button"
+                    className="text-xs text-accent hover:underline"
+                    onClick={() => updateCaret("color", null)}
+                  >
+                    Reset to theme default
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <Popover open={showColorPicker} onOpenChange={setShowColorPicker}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="h-8 w-8 rounded-md border border-[var(--border-subtle)] shrink-0"
+                      style={{ backgroundColor: caret.color ?? "var(--foreground)" }}
+                      aria-label="Pick caret color"
+                    />
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-auto p-3">
+                    <HexColorPicker
+                      color={caret.color ?? "#ffffff"}
+                      onChange={(color: string) => updateCaret("color", color)}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Input
+                  value={caret.color ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "") {
+                      updateCaret("color", null);
+                    } else {
+                      updateCaret("color", val);
+                    }
+                  }}
+                  placeholder="Theme default"
+                  className="w-32 font-mono text-xs"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Hex color for the caret. Leave empty to use the theme foreground color.
+              </p>
+            </div>
+
+            {/* Blink Speed */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Blink Speed</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {caret.blink_speed === 0 ? "No blink" : `${caret.blink_speed}ms`}
+                </span>
+              </div>
+              <Slider
+                value={[caret.blink_speed]}
+                onValueChange={([v]: number[]) =>
+                  updateCaret("blink_speed", Math.round(v / 10) * 10)
+                }
+                min={0}
+                max={2000}
+                step={10}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Blink cycle duration in milliseconds. Set to 0 to disable blinking.
+              </p>
+            </div>
+
+            {/* Opacity */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Opacity</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {Math.round(caret.opacity * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[caret.opacity]}
+                onValueChange={([v]: number[]) => updateCaret("opacity", Math.round(v * 100) / 100)}
+                min={0}
+                max={1.0}
+                step={0.01}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">Caret opacity (0%–100%)</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--border-medium)]" />
+
       {/* Section header */}
       <div className="space-y-1">
         <h2 className="text-base font-semibold text-foreground">UI Customization</h2>
