@@ -23,8 +23,10 @@ import { sendNotification } from "@/lib/systemNotifications";
 import { TerminalInstanceManager } from "@/lib/terminal/TerminalInstanceManager";
 import type { RiskLevel } from "@/lib/tools";
 import {
+  type AppearanceSlice,
   type ContextMetrics,
   type ContextSlice,
+  createAppearanceSlice,
   createContextSlice,
   createGitSlice,
   createNotificationSlice,
@@ -375,7 +377,7 @@ export interface PendingCommand {
   workingDirectory: string;
 }
 
-interface QbitState extends ContextSlice, GitSlice, NotificationSlice, PanelSlice {
+interface QbitState extends AppearanceSlice, ContextSlice, GitSlice, NotificationSlice, PanelSlice {
   // App focus/visibility state
   appIsFocused: boolean;
   appIsVisible: boolean;
@@ -674,6 +676,7 @@ export const useStore = create<QbitState>()(
   devtools(
     immer((set, get, _store) => ({
       // Slices
+      ...createAppearanceSlice(set, get),
       ...createContextSlice(set, get),
       ...createGitSlice(set, get),
       ...createNotificationSlice(set, get),
