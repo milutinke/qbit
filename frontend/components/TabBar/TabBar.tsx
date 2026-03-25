@@ -50,8 +50,9 @@ import { ptyDestroy } from "@/lib/tauri";
 import { liveTerminalManager, TerminalInstanceManager } from "@/lib/terminal";
 import { cn } from "@/lib/utils";
 import { isMockBrowserMode } from "@/mocks";
-import { useStore } from "@/store";
+import { useInputMode, useStore } from "@/store";
 import { type TabItemState, useTabBarState } from "@/store/selectors/tab-bar";
+import { selectDisplaySettings } from "@/store/slices";
 
 const startDrag = async (e: React.MouseEvent) => {
   e.preventDefault();
@@ -78,12 +79,12 @@ function MockDevToolsToggle() {
           onMouseDown={(e) => e.stopPropagation()}
           title="Toggle Mock Dev Tools"
           className={cn(
-            "h-6 w-6",
+            "h-5 w-5",
             "text-[var(--ansi-yellow)] hover:text-[var(--ansi-yellow)] hover:bg-[var(--ansi-yellow)]/10",
             isOpen && "bg-[var(--ansi-yellow)]/20"
           )}
         >
-          <Wrench className="w-4 h-4" />
+          <Wrench className="size-icon-tab-bar" />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
@@ -123,6 +124,11 @@ export const TabBar = React.memo(function TabBar() {
   const closeTab = useStore((state) => state.closeTab);
   const moveTab = useStore((state) => state.moveTab);
   const moveTabToPane = useStore((state) => state.moveTabToPane);
+
+  // Display settings for animated show/hide of right-side buttons
+  const display = useStore(selectDisplaySettings);
+  const inputMode = useInputMode(activeSessionId ?? "");
+  const hideAiItems = display.hideAiSettingsInShellMode && inputMode === "terminal";
 
   // State for convert-to-pane modal
   const [convertToPaneTab, setConvertToPaneTab] = React.useState<string | null>(null);
@@ -202,7 +208,7 @@ export const TabBar = React.memo(function TabBar() {
     <TooltipProvider delayDuration={300}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: div is used for window drag region */}
       <div
-        className="relative z-[200] flex items-center h-[38px] bg-card border-b border-[var(--border-subtle)] pl-[78px] pr-1 gap-1"
+        className="relative z-[200] flex items-center h-[34px] bg-card border-b border-[var(--border-subtle)] pl-[78px] pr-2 gap-1"
         onMouseDown={startDrag}
       >
         <Tabs
@@ -211,13 +217,17 @@ export const TabBar = React.memo(function TabBar() {
           className="min-w-0"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <TabsList className="h-7 bg-transparent p-0 gap-1 w-full justify-start">
+          <TabsList className="h-6 bg-transparent p-0 gap-1 w-full justify-start">
             {tabs.map((tab, index) => {
               const isActive = tab.id === activeSessionId;
               // Compute isBusy from the optimized tab state
               const isBusy = tab.tabType === "terminal" && (tab.isRunning || tab.hasPendingCommand);
               // Show activity indicator for inactive terminal tabs
               const hasNewActivity = tab.tabType === "terminal" && !isActive && tab.hasNewActivity;
+              const isHomeTab = tab.tabType === "home";
+              const homeVisible = display.showHomeTab;
+
+              if (isHomeTab && !homeVisible) return null;
 
               return (
                 <TabItem
@@ -255,9 +265,9 @@ export const TabBar = React.memo(function TabBar() {
               title="New tab"
               onClick={() => createTerminalTab()}
               onMouseDown={(e) => e.stopPropagation()}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+              className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="size-icon-tab-bar" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
@@ -272,67 +282,90 @@ export const TabBar = React.memo(function TabBar() {
         {isMockBrowserMode() && <MockDevToolsToggle />}
 
         {/* File Editor panel toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => useStore.getState().toggleFileEditorPanel()}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
-            >
-              <FileCode className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>File Editor (⇧⌘E)</p>
-          </TooltipContent>
-        </Tooltip>
+        {display.showFileEditorButton && (
+          <div className="shrink-0 flex items-center justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => useStore.getState().toggleFileEditorPanel()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+                >
+                  <FileCode className="size-icon-tab-bar" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>File Editor (⇧⌘E)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
         {/* History button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => useStore.getState().openSessionBrowser()}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
-            >
-              <History className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Session History</p>
-          </TooltipContent>
-        </Tooltip>
+        {display.showHistoryButton && (
+          <div className="ui-fade-width" data-visible={String(!hideAiItems)}>
+            <div className="shrink-0 flex items-center justify-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => useStore.getState().openSessionBrowser()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+                  >
+                    <History className="size-icon-tab-bar" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Session History</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        )}
 
         {/* Settings button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => useStore.getState().openSettingsTab()}
-              onMouseDown={(e) => e.stopPropagation()}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Settings (⌘,)</p>
-          </TooltipContent>
-        </Tooltip>
+        {display.showSettingsButton && (
+          <div className="shrink-0 flex items-center justify-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => useStore.getState().openSettingsTab()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground hover:bg-[var(--bg-hover)]"
+                >
+                  <Settings className="size-icon-tab-bar" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Settings (⌘,)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
-        {/* Separator */}
-        <div className="h-4 w-px bg-border mx-1" />
-
-        {/* Notification widget */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: div is used to prevent drag propagation to notification widget */}
-        <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
-          <NotificationWidget />
-        </div>
+        {/* Separator + Notification widget */}
+        {display.showNotificationBell && (
+          <div className="shrink-0 flex items-center">
+            {/* Separator - only shown when there are buttons to the left */}
+            {(display.showFileEditorButton ||
+              (display.showHistoryButton && !hideAiItems) ||
+              display.showSettingsButton) && (
+              <div className="shrink-0 flex items-center justify-center w-[9px]">
+                <div className="h-4 w-px bg-border" />
+              </div>
+            )}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: div is used to prevent drag propagation to notification widget */}
+            <div className="relative" onMouseDown={(e) => e.stopPropagation()}>
+              <NotificationWidget />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Convert to Pane Modal */}
@@ -499,7 +532,7 @@ const TabItem = React.memo(function TabItem({
               <TabsTrigger
                 value={tab.id}
                 className={cn(
-                  "relative flex items-center gap-2 px-3 py-1.5 rounded-t-md min-w-0 max-w-[200px] text-[11px]",
+                  "relative flex items-center gap-2 px-3 py-1 rounded-t-md min-w-0 max-w-[200px] text-[11px]",
                   tabType === "terminal" && "font-mono",
                   "data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none",
                   "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-[var(--bg-hover)] data-[state=inactive]:hover:text-foreground",
@@ -514,7 +547,7 @@ const TabItem = React.memo(function TabItem({
                 {isBusy && (
                   <Loader2
                     className={cn(
-                      "w-3.5 h-3.5 flex-shrink-0 animate-spin",
+                      "size-icon-tab-bar flex-shrink-0 animate-spin",
                       isActive ? "text-accent" : "text-muted-foreground"
                     )}
                   />
@@ -532,7 +565,7 @@ const TabItem = React.memo(function TabItem({
                 {tabType !== "terminal" && !isBusy && (
                   <ModeIcon
                     className={cn(
-                      "w-3.5 h-3.5 flex-shrink-0",
+                      "size-icon-tab-bar flex-shrink-0",
                       isActive ? "text-accent" : "text-muted-foreground"
                     )}
                   />
@@ -611,31 +644,31 @@ const TabItem = React.memo(function TabItem({
       <ContextMenuContent>
         {/* Move left/right - available on all non-home tabs */}
         <ContextMenuItem onClick={onMoveLeft} disabled={!canMoveLeft}>
-          <ArrowLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="size-icon-tab-bar" />
           Move Left
         </ContextMenuItem>
         <ContextMenuItem onClick={onMoveRight} disabled={!canMoveRight}>
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="size-icon-tab-bar" />
           Move Right
         </ContextMenuItem>
         <ContextMenuSeparator />
         {/* Convert to pane - only for terminal tabs */}
         {tabType === "terminal" && (
           <ContextMenuItem onClick={onConvertToPane}>
-            <PanelLeft className="w-3.5 h-3.5" />
+            <PanelLeft className="size-icon-tab-bar" />
             Convert to Pane
           </ContextMenuItem>
         )}
         {tabType === "terminal" && (
           <ContextMenuItem onClick={() => onDuplicateTab(tab.workingDirectory)}>
-            <Copy className="w-3.5 h-3.5" />
+            <Copy className="size-icon-tab-bar" />
             Duplicate Tab
           </ContextMenuItem>
         )}
         {tabType === "terminal" && canClose && <ContextMenuSeparator />}
         {canClose && (
           <ContextMenuItem variant="destructive" onClick={(e) => onClose(e)}>
-            <X className="w-3.5 h-3.5" />
+            <X className="size-icon-tab-bar" />
             Close Tab
           </ContextMenuItem>
         )}

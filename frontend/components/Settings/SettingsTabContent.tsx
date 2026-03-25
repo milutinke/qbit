@@ -10,6 +10,7 @@ import {
   FileCode,
   FolderCode,
   Loader2,
+  Paintbrush,
   Puzzle,
   Server,
   Shield,
@@ -27,6 +28,7 @@ import {
   updateSettings,
 } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { AppearanceSettings } from "./AppearanceSettings";
 import { AdvancedSettings } from "./AdvancedSettings";
 import { AgentSettings } from "./AgentSettings";
 import { AiSettings } from "./AiSettings";
@@ -46,6 +48,7 @@ type SettingsSection =
   | "mcp"
   | "codebases"
   | "notifications"
+  | "appearance"
   | "advanced";
 
 interface NavItem {
@@ -103,6 +106,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Notifications",
     icon: <Bell className="w-4 h-4" />,
     description: "System notification settings",
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    icon: <Paintbrush className="w-4 h-4" />,
+    description: "UI element visibility",
   },
   {
     id: "advanced",
@@ -216,6 +225,13 @@ export function SettingsTabContent() {
           <NotificationsSettings
             settings={settings.notifications}
             onChange={(notifications) => updateSection("notifications", notifications)}
+          />
+        );
+      case "appearance":
+        return (
+          <AppearanceSettings
+            terminalSettings={settings.terminal}
+            onTerminalChange={(terminal) => updateSection("terminal", terminal)}
           />
         );
       case "advanced":

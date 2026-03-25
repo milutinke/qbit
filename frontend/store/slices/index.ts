@@ -47,6 +47,18 @@ export {
   selectUnreadNotificationCount,
 } from "./notification";
 
+// Appearance slice
+export {
+  createAppearanceSlice,
+  defaultDisplaySettings,
+  initialAppearanceState,
+  type AppearanceActions,
+  type AppearanceSlice,
+  type AppearanceState,
+  type DisplaySettings,
+  selectDisplaySettings,
+} from "./appearance";
+
 // Panel slice
 export {
   createPanelSlice,

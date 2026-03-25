@@ -12,7 +12,11 @@ on:
         description: 'Run scenarios in parallel'
         type: boolean
         default: false
-  # Run on PRs
+      branch:
+        description: 'Branch or PR ref to evaluate (e.g. refs/pull/123/head). Leave empty to use the default branch.'
+        required: false
+        default: ''
+  # Run on PRs from trusted contributors only (secrets are not available to forks/external PRs)
   pull_request:
     branches: [main]
   # Run weekly to keep cache warm and catch regressions
@@ -39,9 +43,17 @@ jobs:
       fail-fast: false
       matrix:
         provider: [vertex-claude]
+    # Skip pull_request events from untrusted authors (no repo association).
+    # Maintainers can trigger manually via workflow_dispatch with a branch input instead.
+    if: >-
+      (github.event_name != 'pull_request') ||
+      (github.event.pull_request.author_association == 'MEMBER') ||
+      (github.event.pull_request.author_association == 'OWNER')
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || '' }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
