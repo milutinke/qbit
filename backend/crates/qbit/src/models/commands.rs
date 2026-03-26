@@ -3,20 +3,36 @@
 //! These commands expose the model registry to the frontend, allowing
 //! the UI to dynamically fetch available models and their capabilities.
 
+use super::openrouter::get_openrouter_models;
+use crate::state::AppState;
 use qbit_models::{
     get_all_models_owned, get_all_provider_info, get_model_capabilities, get_model_owned,
     get_models_for_provider_owned, AiProvider, ModelCapabilities, OwnedModelDefinition,
     ProviderInfo,
 };
+use tauri::State;
 
 /// Get all available models from all providers.
 #[tauri::command]
 pub async fn get_available_models(
+    state: State<'_, AppState>,
     provider: Option<AiProvider>,
 ) -> Result<Vec<OwnedModelDefinition>, String> {
+    let settings = state.settings_manager.get().await;
+    let openrouter_api_key = settings.ai.openrouter.api_key;
+
     match provider {
+        Some(AiProvider::Openrouter) => {
+            Ok(get_openrouter_models(openrouter_api_key.as_deref()).await)
+        }
         Some(p) => Ok(get_models_for_provider_owned(p)),
-        None => Ok(get_all_models_owned()),
+        None => {
+            let mut models = get_all_models_owned();
+            let openrouter_models = get_openrouter_models(openrouter_api_key.as_deref()).await;
+            models.retain(|model| model.provider != AiProvider::Openrouter);
+            models.extend(openrouter_models);
+            Ok(models)
+        }
     }
 }
 

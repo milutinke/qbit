@@ -1,5 +1,5 @@
 import { Check, ChevronRight, ChevronsUpDown } from "lucide-react";
-import { type JSX, useState } from "react";
+import { type JSX, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -10,6 +10,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 import type { ReasoningEffort } from "@/lib/ai";
 import { type ModelEntry, PROVIDER_GROUPS_NESTED, type ProviderGroupNested } from "@/lib/models";
 import type { AiProvider, AiSettings } from "@/lib/settings";
@@ -101,19 +102,31 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const openrouterEnabled = isProviderAvailable(settings, "openrouter");
+  const { models: openrouterModels } = useOpenRouterModels(openrouterEnabled);
+  const providerGroups = useMemo(
+    () =>
+      PROVIDER_GROUPS_NESTED.map((group) =>
+        group.provider === "openrouter"
+          ? {
+              ...group,
+              models: openrouterModels.map((openrouterModel) => ({
+                id: openrouterModel.id,
+                name: openrouterModel.name,
+              })),
+            }
+          : group
+      ),
+    [openrouterModels]
+  );
 
   // Filter to only configured providers with show_in_selector enabled
-  const availableProviders = PROVIDER_GROUPS_NESTED.filter((g) =>
+  const availableProviders = providerGroups.filter((g) =>
     isProviderAvailable(settings, g.provider)
   );
 
   // Find current selection display info
-  const currentDisplay = findCurrentModelDisplay(
-    PROVIDER_GROUPS_NESTED,
-    provider,
-    model,
-    reasoningEffort
-  );
+  const currentDisplay = findCurrentModelDisplay(providerGroups, provider, model, reasoningEffort);
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((prev) => {

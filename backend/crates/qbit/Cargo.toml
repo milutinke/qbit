@@ -52,6 +52,7 @@ atty = { workspace = true }
 # Serialization
 serde.workspace = true
 serde_json.workspace = true
+reqwest.workspace = true
 
 # Async runtime
 tokio.workspace = true
