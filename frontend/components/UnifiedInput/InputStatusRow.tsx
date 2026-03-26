@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 import { useProviderSettings } from "@/hooks/useProviderSettings";
 import {
   type ApiRequestStatsSnapshot,
@@ -282,6 +283,9 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
 
   // Use consolidated provider settings hook
   const [providerSettings, refreshProviderSettings] = useProviderSettings();
+  const { models: openrouterModels, refresh: refreshOpenRouterModels } = useOpenRouterModels(
+    providerSettings.enabled.openrouter && providerSettings.visibility.openrouter
+  );
 
   // Extract values from consolidated state for easier access
   const {
@@ -293,6 +297,11 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
     langfuseActive,
     telemetryStats,
   } = providerSettings;
+  const currentModelLabel =
+    provider === "openrouter"
+      ? (openrouterModels.find((candidate) => candidate.id === model)?.name ??
+        formatModelName(model, currentReasoningEffort))
+      : formatModelName(model, currentReasoningEffort);
 
   const [debugOpen, setDebugOpen] = useState(false);
   const debugPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -740,7 +749,18 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
                   <span>Enable a provider in settings</span>
                 </div>
               ) : (
-                <DropdownMenu onOpenChange={(open) => open && refreshProviderSettings()}>
+                <DropdownMenu
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      return;
+                    }
+
+                    void refreshProviderSettings();
+                    if (providerVisibility.openrouter && providerEnabled.openrouter) {
+                      void refreshOpenRouterModels();
+                    }
+                  }}
+                >
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
@@ -748,7 +768,7 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
                       className="h-6 px-2.5 gap-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:text-accent hover:bg-accent/20 border border-accent/20 hover:border-accent/30"
                     >
                       <Cpu className="size-icon-status-bar" />
-                      <span>{formatModelName(model, currentReasoningEffort)}</span>
+                      <span>{currentModelLabel}</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -809,7 +829,7 @@ export const InputStatusRow = memo(function InputStatusRow({ sessionId }: InputS
                         <div className="px-2 py-1 text-[10px] text-muted-foreground uppercase tracking-wide">
                           OpenRouter
                         </div>
-                        {(getProviderGroup("openrouter")?.models ?? []).map((m) => (
+                        {openrouterModels.map((m) => (
                           <DropdownMenuItem
                             key={m.id}
                             onClick={() => handleModelSelect(m.id, "openrouter")}

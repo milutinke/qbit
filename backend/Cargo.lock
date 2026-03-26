@@ -4515,6 +4515,7 @@ dependencies = [
  "qbit-synthesis",
  "qbit-tools",
  "qbit-workflow",
+ "reqwest 0.13.2",
  "rig-core",
  "rustls",
  "serde",
