@@ -10,7 +10,7 @@ export function useOpenRouterModels(enabled: boolean): {
 } {
   const [models, setModels] = useState<ModelInfo[]>(FALLBACK_OPENROUTER_MODELS);
 
-  const refresh = useCallback(async () => {
+  const loadModels = useCallback(async () => {
     if (!enabled) {
       setModels(FALLBACK_OPENROUTER_MODELS);
       return;
@@ -25,9 +25,13 @@ export function useOpenRouterModels(enabled: boolean): {
     }
   }, [enabled]);
 
+  const refresh = useCallback(async () => {
+    await loadModels();
+  }, [loadModels]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void loadModels();
+  }, [loadModels]);
 
   return { models, refresh };
 }

@@ -16,6 +16,12 @@ const OPENROUTER_MODELS_CACHE_TTL_SECS: i64 = 60 * 60;
 
 static OPENROUTER_MODELS_CACHE: LazyLock<RwLock<Option<OpenRouterModelsCache>>> =
     LazyLock::new(|| RwLock::new(None));
+static OPENROUTER_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .expect("OpenRouter HTTP client should build")
+});
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct OpenRouterModelsCache {
@@ -86,11 +92,7 @@ async fn stale_cache_or_static_fallback() -> Vec<OwnedModelDefinition> {
 async fn fetch_openrouter_models(
     api_key: &str,
 ) -> Result<Vec<CachedOpenRouterModel>, reqwest::Error> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .build()?;
-
-    let response = client
+    let response = OPENROUTER_HTTP_CLIENT
         .get(OPENROUTER_MODELS_URL)
         .bearer_auth(api_key)
         .header(reqwest::header::ACCEPT, "application/json")
@@ -125,7 +127,8 @@ fn normalize_openrouter_models(models: Vec<OpenRouterModel>) -> Vec<CachedOpenRo
         })
         .collect::<Vec<_>>();
 
-    normalized.sort_by_cached_key(|model| (model.display_name.to_lowercase(), model.id.clone()));
+    normalized.sort_by(|left, right| left.id.cmp(&right.id));
+    normalized.sort_by_key(|model| model.display_name.to_ascii_lowercase());
     normalized
 }
 
@@ -164,10 +167,16 @@ fn static_openrouter_models() -> Vec<OwnedModelDefinition> {
 async fn get_cached_models(fresh_only: bool) -> Option<OpenRouterModelsCache> {
     let now = Utc::now();
 
-    if let Some(cache) = OPENROUTER_MODELS_CACHE.read().clone() {
-        if !fresh_only || is_cache_fresh(&cache, now) {
-            return Some(cache);
-        }
+    let cached_models = {
+        let cache = OPENROUTER_MODELS_CACHE.read();
+        cache
+            .as_ref()
+            .filter(|entry| !fresh_only || is_cache_fresh(entry, now))
+            .cloned()
+    };
+
+    if let Some(cache) = cached_models {
+        return Some(cache);
     }
 
     let cache = load_cache_from_disk().await?;
@@ -210,6 +219,10 @@ fn set_memory_cache(cache: OpenRouterModelsCache) {
 }
 
 fn cache_file_path() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("QBIT_CACHE_DIR") {
+        return Some(PathBuf::from(path).join("openrouter-models.json"));
+    }
+
     dirs::home_dir().map(|home| {
         home.join(".qbit")
             .join("cache")
@@ -219,7 +232,7 @@ fn cache_file_path() -> Option<PathBuf> {
 
 fn is_cache_fresh(cache: &OpenRouterModelsCache, now: DateTime<Utc>) -> bool {
     now.signed_duration_since(cache.fetched_at)
-        < Duration::seconds(OPENROUTER_MODELS_CACHE_TTL_SECS)
+        <= Duration::seconds(OPENROUTER_MODELS_CACHE_TTL_SECS)
 }
 
 #[cfg(test)]
